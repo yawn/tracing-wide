@@ -1,0 +1,5 @@
+error: unknown level `bogus` (expected trace/debug/info/warn/error)
+ --> tests/ui/unknown_level.rs:3:8
+  |
+3 | struct M {
+  |        ^

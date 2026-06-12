@@ -1,0 +1,5 @@
+error: expected `key = value`; `#[message]` takes no bare flags (serialization is enabled by `#[derive(Serialize)]`)
+ --> tests/ui/bare_flag.rs:3:25
+  |
+3 | #[tracing_wide::message(serialize)]
+  |                         ^^^^^^^^^

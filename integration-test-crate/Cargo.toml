@@ -1,0 +1,8 @@
+[package]
+name = "integration-test-crate"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+tracing-wide = { path = "../tracing-wide", default-features = false }

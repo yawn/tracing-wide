@@ -1,0 +1,94 @@
+[package]
+name = "tracing-wide"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = [ "std" ]
+docs-features = ["dep:document-features"]
+
+## Auto-collected per-type catalogue: inventory registration + descriptors. On its
+## own the descriptors are plain data; add `serde` and they gain `Serialize`.
+##
+## Tooling-only feature. Should neither be enabled for applications nor libraries.
+catalogue = ["dep:inventory", "std"]
+
+## Instrument integration (ambient autocapture): a tracing-subscriber `Layer`
+## that captures span field values — i.e. what `tracing::instrument` records —
+## and an emit-time join that fills a message's still-`None` `Option` fields by
+## name from the current span scope. Only `Option` fields join; a miss is legal
+## (`None`). Requires the app's subscriber to be built on
+## `tracing_subscriber::registry()` with `instrument::layer()` installed —
+## without them, `event!` degrades gracefully (fields stay `None`).
+##
+## Application-only feature. Should only be enabled for applications, not for libraries.
+instrument = ["dep:tracing-subscriber", "std"]
+
+## Serde integration. On its own: the erased-serde hook on `Message` (`as_serialize`)
+## that lets a subscriber serialize a live message body without naming its concrete
+## type — enabled per type by `#[derive(Serialize)]` alone. Combined with `catalogue`,
+## the catalogue descriptors also derive `Serialize` (for dumping to JSON/TOML).
+serde = ["dep:serde", "dep:erased-serde", "std"]
+
+## Opt-in std - required for all features beyond core functionality.
+std = ["tracing/std"]
+
+## Global subscriber registry + typed `&dyn Message` fan-out that
+## runs before the tracing handoff. Without it, `event!` just records to tracing.
+##
+## Application-only feature. Should only be enabled for applications, not for libraries.
+subscriber = ["std"]
+
+[dependencies]
+tracing-wide-macros = { path = "../tracing-wide-macros" }
+
+document-features = { version = "0.2", optional = true }
+erased-serde = { version = "0.4", optional = true }
+inventory = { version = "0.3", optional = true }
+serde = { version = "1.0", optional = true, features = ["derive"] }
+tracing = { version = "0.1", default-features = false }
+tracing-subscriber = { version = "0.3", optional = true, default-features = false, features = ["registry", "std"] }
+
+[dev-dependencies]
+# Fixture defining messages from *outside* this crate, for the cross-crate
+# tests — a dev-dependency cycle, which Cargo permits for the back-edge.
+integration-test-crate = { path = "../integration-test-crate" }
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = { version = "0.1", default-features = false, features = ["attributes", "std"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["registry", "std"] }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+serde_norway = "0.9"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
+trybuild = "1.0"
+
+# One example per feature (`serde`'s is `serializable`); each example's module
+# docs carry its description and run command.
+
+[[example]]
+name = "catalogue"
+required-features = ["catalogue", "serde"]
+
+[[example]]
+name = "instrument"
+required-features = ["instrument", "subscriber"]
+
+[[example]]
+name = "serializable"
+required-features = ["subscriber", "serde"]
+
+[[example]]
+name = "subscriber"
+required-features = ["subscriber"]
+
+[[example]]
+name = "tags"
+required-features = ["subscriber"]
+
+[package.metadata.docs.rs]
+features = ["catalogue", "docs-features", "instrument", "serde", "std", "subscriber" ]

@@ -1,0 +1,33 @@
+error[E0277]: the trait bound `NotAMessage: tracing_wide::__private::MessageBehaviour` is not satisfied
+ --> tests/ui/event_non_message.rs:5:5
+  |
+5 |     tracing_wide::event!(NotAMessage);
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+  |
+help: the trait `tracing_wide::__private::MessageBehaviour` is not implemented for `NotAMessage`
+ --> tests/ui/event_non_message.rs:2:1
+  |
+2 | struct NotAMessage;
+  | ^^^^^^^^^^^^^^^^^^
+  = note: this error originates in the macro `tracing_wide::event` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `NotAMessage: Message` is not satisfied
+ --> tests/ui/event_non_message.rs:5:5
+  |
+5 |     tracing_wide::event!(NotAMessage);
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+  |
+help: the trait `Message` is not implemented for `NotAMessage`
+ --> tests/ui/event_non_message.rs:2:1
+  |
+2 | struct NotAMessage;
+  | ^^^^^^^^^^^^^^^^^^
+note: required by a bound in `tracing_wide::__private::MessageBehaviour::emit`
+ --> src/lib.rs
+  |
+  |         fn emit(&self)
+  |            ---- required by a bound in this associated function
+  |         where
+  |             Self: crate::Message + Sized,
+  |                   ^^^^^^^^^^^^^^ required by this bound in `MessageBehaviour::emit`
+  = note: this error originates in the macro `tracing_wide::event` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -1,0 +1,10 @@
+[workspace]
+resolver = "3"
+members = ["integration-test-crate", "tracing-wide", "tracing-wide-macros"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+[profile.dev]
+debug = 1

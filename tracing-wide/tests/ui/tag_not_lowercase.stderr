@@ -1,0 +1,5 @@
+error: tags must be lowercase; use `security`
+ --> tests/ui/tag_not_lowercase.rs:3:44
+  |
+3 | #[tracing_wide::message(msg = "x", tags = ["Security"])]
+  |                                            ^^^^^^^^^^

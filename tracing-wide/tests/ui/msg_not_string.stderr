@@ -1,0 +1,5 @@
+error: `msg` must be a string literal
+ --> tests/ui/msg_not_string.rs:2:31
+  |
+2 | #[tracing_wide::message(msg = 5)]
+  |                               ^
