@@ -581,12 +581,13 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
     })
 }
 
-/// Attribute macro: mark a struct as a `Message`. Implements the
-/// (pseudo-sealed) `Message`/`MessageBehaviour` traits, fills the inherent
-/// `MSG` const from
-/// `#[message(msg = "...")]` (defaulting to the struct name), generates the
-/// tracing recording, and asserts every field type is a `Field`. The point is
-/// to keep the message static and put all variance in the typed fields.
+/// Attribute macro: mark a struct as a `Message`.
+///
+/// Implements the (pseudo-sealed) `Message`/`MessageBehaviour` traits, fills
+/// the inherent `MSG` const from `#[message(msg = "...")]` (defaulting to the
+/// struct name), generates the tracing recording, and asserts every field type
+/// is a `Field`. The point is to keep the message static and put all variance
+/// in the typed fields.
 ///
 /// A struct-level `#[deprecated]` is honored like a field-level one: producers
 /// get rustc's native warning, the note lands in the catalogue descriptor, and

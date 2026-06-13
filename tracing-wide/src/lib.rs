@@ -22,18 +22,22 @@ pub mod instrument;
 #[cfg(feature = "subscriber")]
 pub mod subscriber;
 
-/// Marker trait: a type eligible to be a field of a message, blanket-implemented
-/// for every `tracing::field::Value` — the supertrait bound guarantees every
-/// field can be handed to tracing, and `Option<T: Value>` is covered for free.
+/// Marker trait: a type eligible to be a field of a message.
+///
+/// Blanket-implemented for every `tracing::field::Value` — the supertrait bound
+/// guarantees every field can be handed to tracing, and `Option<T: Value>` is
+/// covered for free.
+///
 /// The trait carries no constraint of its own; it exists for the name and as the
 /// single seam to tighten the field contract later. Serialization is never part
 /// of this bound — it is opted into case-by-case at the subscriber.
 pub trait Field: tracing::field::Value {}
 
-/// A struct that may be emitted as a wide event. Apply `#[message]`, which
-/// implements this trait, enforces that every field is a [`Field`], and fills
-/// the inherent consts (`MSG`, `LEVEL`, `ORIGIN`, `TAGS`) the methods below
-/// mirror (associated consts aren't object-safe).
+/// A struct that may be emitted as a wide event.
+///
+/// Apply `#[message]`, which implements this trait, enforces that every field is
+/// a [`Field`], and fills the inherent consts (`MSG`, `LEVEL`, `ORIGIN`, `TAGS`)
+/// the methods below mirror (associated consts aren't object-safe).
 ///
 /// Object-safe, so subscribers can receive `&dyn Message`. Pseudo-sealed
 /// against accidental hand-written impls via the hidden
@@ -78,10 +82,11 @@ pub trait Message: __private::MessageBehaviour {
 /// Where a message *type* is defined — automatic provenance captured by
 /// `#[message]`, which emits the `core` location builtins
 /// (`env!("CARGO_PKG_NAME")`, `module_path!`, `file!`, `line!`, `column!`) for
-/// rustc to fill while compiling the *defining* crate. Reachable on every
-/// message through [`Message::origin`], so a subscriber can attribute or route
-/// a `&dyn Message` without naming the concrete type. All fields are
-/// `&'static`/`u32`, so `Origin` is `Copy` and stays `no_std`.
+/// rustc to fill while compiling the *defining* crate.
+///
+/// Reachable on every message through [`Message::origin`], so a subscriber can
+/// attribute or route a `&dyn Message` without naming the concrete type. All
+/// fields are `&'static`/`u32`, so `Origin` is `Copy` and stays `no_std`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Origin {
     /// Column of the definition (`column!()`).
