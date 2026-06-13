@@ -11,9 +11,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-// Needed only because we are not actually using any code from
-// integration_test_crate. No usage, no linkage, no messages.
-use integration_test_crate as _;
 use tracing_wide::{catalogue::MessageDescriptor, message};
 
 /// Recorded when a request finishes handling.
