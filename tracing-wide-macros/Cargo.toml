@@ -1,7 +1,13 @@
 [package]
+description = "Procedural macros for tracing-wide: the `#[message]` attribute and `event!` macro."
 name = "tracing-wide-macros"
-version.workspace = true
+
 edition.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
 
 [lib]
 proc-macro = true

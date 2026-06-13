@@ -3,8 +3,18 @@ resolver = "3"
 members = ["integration-test-crate", "tracing-wide", "tracing-wide-macros"]
 
 [workspace.package]
-version = "0.1.0"
 edition = "2024"
+keywords = ["logging", "tracing"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yawn/tracing-wide"
+rust-version = "1.91" # required for const TypeId::of
+version = "0.1.0"
+
+# Exact pin: the macro expansions and the runtime crate are one unit — version
+# skew between them is never supported. Keep in lockstep with
+# `workspace.package.version` above when releasing (Cargo cannot reference it).
+[workspace.dependencies]
+tracing-wide-macros = { path = "tracing-wide-macros", version = "=0.1.0" }
 
 [profile.dev]
 debug = 1
