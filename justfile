@@ -9,6 +9,7 @@ check-wasm:
     {{HACK}} check --target wasm32-unknown-unknown
 
 docs:
+    rm -rf target/doc
     RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps
 
 examples: example-catalogue example-instrument example-subscriber example-serializable example-tags
