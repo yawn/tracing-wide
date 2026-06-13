@@ -65,7 +65,10 @@ struct CaptureVisitor<'a>(&'a mut Vec<(&'static str, CapturedValue)>);
 
 /// Conversion from a [`CapturedValue`] into a field's inner type. Implemented
 /// for the primitives and `String`; integer conversions are lossless
-/// (`try_from`) — an out-of-range capture is a miss, not a wrap.
+/// (`try_from`) — an out-of-range capture is a miss, not a wrap. Likewise
+/// `f32`: tracing widens every float to `f64`, so the conversion narrows only
+/// when the value round-trips exactly (true for anything recorded as `f32`;
+/// NaN passes) — a genuine `f64` that can't be represented is a miss.
 pub trait FromCaptured: Sized {
     fn from_captured(value: &CapturedValue) -> Option<Self>;
 }
@@ -109,6 +112,18 @@ impl FromCaptured for bool {
     fn from_captured(value: &CapturedValue) -> Option<Self> {
         match *value {
             CapturedValue::Bool(b) => Some(b),
+            _ => None,
+        }
+    }
+}
+
+impl FromCaptured for f32 {
+    fn from_captured(value: &CapturedValue) -> Option<Self> {
+        match *value {
+            CapturedValue::F64(f) => {
+                let narrowed = f as f32;
+                (f64::from(narrowed) == f || f.is_nan()).then_some(narrowed)
+            }
             _ => None,
         }
     }

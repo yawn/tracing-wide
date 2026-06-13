@@ -582,6 +582,33 @@ mod instrument {
         assert!(events[0].contains(&("component".to_string(), "local".to_string())));
     }
 
+    /// `ratio` narrows losslessly from the span's widened `f64`; `skew` is a
+    /// genuine `f64` that `f32` can't represent, so it must stay `None`.
+    #[message(msg = "float event")]
+    #[derive(Default)]
+    struct Floats {
+        ratio: Option<f32>,
+        skew: Option<f32>,
+    }
+
+    #[cfg_attr(not(target_arch = "wasm32"), test)]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+    fn f32_fields_fill_only_losslessly() {
+        let events = collect(|| {
+            let span = tracing::info_span!("req", ratio = 0.5_f32, skew = 0.1_f64);
+            let _enter = span.enter();
+
+            event!(Floats::default());
+        });
+
+        assert_eq!(events.len(), 1);
+        assert!(events[0].contains(&("ratio".to_string(), "0.5".to_string())));
+
+        let names: Vec<&str> = events[0].iter().map(|(n, _)| n.as_str()).collect();
+
+        assert!(!names.contains(&"skew"), "a lossy f64→f32 must miss");
+    }
+
     #[cfg_attr(not(target_arch = "wasm32"), test)]
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
     fn missing_capture_layer_is_a_quiet_miss() {
