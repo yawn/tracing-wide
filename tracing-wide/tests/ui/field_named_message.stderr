@@ -1,0 +1,5 @@
+error: a message field must not be named `message`; tracing reserves it for the event text
+ --> tests/ui/field_named_message.rs:5:5
+  |
+5 |     message: usize,
+  |     ^^^^^^^

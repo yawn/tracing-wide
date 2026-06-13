@@ -148,6 +148,18 @@ impl MessageField {
     }
 
     fn parse(field: &syn::Field) -> syn::Result<Self> {
+        let ident = field.ident.clone().expect("named field");
+
+        // tracing's macros merge a field named `message` into the event's
+        // message text, silently losing the key.
+        if ident == "message" {
+            return Err(Error::new_spanned(
+                &ident,
+                "a message field must not be named `message`; \
+                 tracing reserves it for the event text",
+            ));
+        }
+
         let mut meta = MetaPairs::default();
 
         for a in &field.attrs {
@@ -164,7 +176,7 @@ impl MessageField {
         Ok(MessageField {
             deprecated: Deprecation::harvest(&field.attrs),
             doc: Docs::harvest(&field.attrs),
-            ident: field.ident.clone().expect("named field"),
+            ident,
             meta,
             ty: field.ty.clone(),
         })
@@ -182,6 +194,13 @@ impl MetaPairs {
                 "metadata keys must be identifiers",
             ));
         };
+
+        if self.0.iter().any(|(k, _)| key == k) {
+            return Err(Error::new_spanned(
+                key,
+                format!("duplicate metadata key `{key}`"),
+            ));
+        }
 
         let value = match &kv.value {
             Expr::Lit(ExprLit {
@@ -335,6 +354,17 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
     let mut input: DeriveInput = syn::parse2(item)?;
     let name = input.ident.clone();
 
+    // The generated impls and the catalogue's `TypeId::of` need one concrete
+    // `'static` type; reject generics up front instead of leaking E0107s from
+    // the expansion.
+    if !input.generics.params.is_empty() {
+        return Err(Error::new_spanned(
+            &input.generics,
+            "#[message] does not support generic parameters \
+             (a message must be a concrete `'static` type)",
+        ));
+    }
+
     let mut msg: Option<String> = None;
     let mut level: Option<String> = None;
     let mut tags = Tags::default();
@@ -394,6 +424,13 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
         }
     }
     let msg = msg.unwrap_or_else(|| name.to_string());
+
+    // tracing's macros treat the trailing literal as a format string; escape
+    // braces so a `msg` containing `{`/`}` records verbatim instead of
+    // triggering format-argument capture (rendering un-escapes them, so the
+    // recorded text still matches `MSG`).
+    let msg_record = msg.replace('{', "{{").replace('}', "}}");
+
     let msg_doc = Docs::harvest(&input.attrs);
     let msg_deprecation = Deprecation::harvest(&input.attrs);
 
@@ -533,7 +570,7 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
             // read them); only the producer's construction should warn.
             #[allow(deprecated)]
             fn record(&self) {
-                ::tracing_wide::__private::tracing::#level_macro!( #( #idents = &self.#idents, )* #msg );
+                ::tracing_wide::__private::tracing::#level_macro!( #( #idents = &self.#idents, )* #msg_record );
             }
         }
 
@@ -662,6 +699,58 @@ mod tests {
         let err =
             expand_message(quote! { owner(x) }, quote! { struct M { a: usize } }).unwrap_err();
         assert!(err.to_string().contains("not a list"));
+    }
+
+    #[test]
+    fn message_rejects_duplicate_meta_key() {
+        let err = expand_message(
+            quote! { owner = "a", owner = "b" },
+            quote! { struct M { a: usize } },
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("duplicate metadata key `owner`"));
+
+        let err = expand_message(
+            quote! {},
+            quote! { struct M { #[field(unit = "ms", unit = "s")] a: usize } },
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("duplicate metadata key `unit`"));
+    }
+
+    #[test]
+    fn message_rejects_field_named_message() {
+        let err = expand_message(quote! {}, quote! { struct M { message: usize } }).unwrap_err();
+        assert!(err.to_string().contains("must not be named `message`"));
+    }
+
+    #[test]
+    fn message_rejects_generic_params() {
+        let cases = [
+            quote! { struct M<T> { a: T } },
+            quote! { struct M<'a> { a: &'a str } },
+            quote! { struct M<const N: usize> { a: usize } },
+        ];
+
+        for item in cases {
+            let err = expand_message(quote! {}, item).unwrap_err();
+            assert!(err.to_string().contains("generic parameters"));
+        }
+    }
+
+    #[test]
+    fn message_escapes_braces_in_recorded_msg() {
+        let expanded = expand_message(
+            quote! { msg = "rate {limit} hit" },
+            quote! { struct M { a: usize } },
+        )
+        .expect("expansion succeeds");
+        let pretty = prettyplease::unparse(&syn::parse2::<syn::File>(expanded).unwrap());
+
+        // The const keeps the text verbatim; only the tracing handoff (a
+        // format string position) sees the escaped form.
+        assert!(pretty.contains(r#""rate {limit} hit""#), "{pretty}");
+        assert!(pretty.contains(r#""rate {{limit}} hit""#), "{pretty}");
     }
 
     #[test]

@@ -50,6 +50,14 @@ struct Renamed {
     x: usize,
 }
 
+/// `msg` containing format braces: the macro escapes them for tracing's
+/// format-string position, so the recorded text matches `MSG` verbatim.
+#[message(msg = "rate {limit} hit")]
+#[derive(Default)]
+struct Braced {
+    n: usize,
+}
+
 /// Emitted when a service finishes starting up.
 #[message(msg = "service started", level = warn, owner = "platform", tags = ["platform", "startup"])]
 #[derive(Default)]
@@ -246,6 +254,21 @@ fn event_records_to_tracing_at_the_typed_level() {
 
     let got = log.lock().unwrap();
     assert_eq!(*got, vec![(Level::WARN, "service started".to_string())]);
+}
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn braces_in_msg_record_verbatim() {
+    assert_eq!(Braced::MSG, "rate {limit} hit");
+
+    let log = Arc::new(Mutex::new(Vec::new()));
+
+    tracing::subscriber::with_default(EventCollector(log.clone()), || {
+        event!(Braced::default());
+    });
+
+    let got = log.lock().unwrap();
+    assert_eq!(*got, vec![(Level::INFO, "rate {limit} hit".to_string())]);
 }
 
 /// Collects every recorded field of each event as `(name, rendered)` pairs.
