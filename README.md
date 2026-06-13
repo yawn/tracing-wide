@@ -1,5 +1,7 @@
 # `tracing-wide`
 
+[![CI](https://github.com/yawn/tracing-wide/actions/workflows/ci.yml/badge.svg)](https://github.com/yawn/tracing-wide/actions/workflows/ci.yml)
+
 > [!CAUTION]
 > This is *NOT* an official [tokio](https://tokio.rs) / [tokio-tracing](https://github.com/tokio-rs/tracing) product or associated crate.
 
