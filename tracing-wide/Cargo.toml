@@ -1,6 +1,7 @@
 [package]
 description = "Wide structured events for tokio `tracing`: define a struct per event and emit all observability-relevant fields at one site."
 name = "tracing-wide"
+readme = "README.md"
 # The tests need `integration-test-crate`, a path-only dev-dependency Cargo
 # strips on publish — they could never build from the package.
 exclude = ["/tests"]

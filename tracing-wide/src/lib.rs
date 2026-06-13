@@ -1,4 +1,6 @@
-#![doc = include_str!("../../README.md")]
+// Via the package-local symlink, so the path also resolves inside the
+// published archive (where `../../README.md` would not exist).
+#![doc = include_str!("../README.md")]
 //!
 //! # Feature flags
 //!
