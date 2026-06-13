@@ -45,6 +45,10 @@ jobs:
           tool: just,cargo-hack
       - run: rustc --version
       - run: just test-native
+      # trybuild's `ui` suite leaves a nested target tree under target/tests that
+      # rust-cache's post-step cleanup trips over (ENOENT opendir). Drop it here;
+      # the docs/examples steps below don't need it.
+      - run: rm -rf target/tests
       - run: just docs
       - run: just examples
 
