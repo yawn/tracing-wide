@@ -21,6 +21,7 @@ use wasm_bindgen_test::wasm_bindgen_test;
 #[cfg(feature = "subscriber")]
 #[message(msg = "captured event", level = error)]
 #[derive(Default)]
+#[cfg_attr(feature = "facet", derive(tracing_wide::facet::Facet))]
 struct CapturedEvent {
     n: usize,
 }
@@ -166,6 +167,30 @@ impl tracing::Subscriber for OrderTracing {
     fn exit(&self, _: &tracing::span::Id) {}
 }
 
+/// Exercises the `facet` hook *inside* a subscriber — the path the
+/// `subscriber-facet` example shows, here under test on native and wasm. Filters to its dedicated
+/// type for the same isolation reason as [`Recorder`], then reads a field by
+/// name through reflection rather than the concrete type.
+#[cfg(all(feature = "subscriber", feature = "facet"))]
+struct FacetProbe(Arc<Mutex<Vec<usize>>>);
+
+#[cfg(all(feature = "subscriber", feature = "facet"))]
+impl Subscriber for FacetProbe {
+    fn on_message(&self, m: &dyn Message) {
+        if m.as_any().downcast_ref::<CapturedEvent>().is_none() {
+            return;
+        }
+
+        if let Some(peek) = m.as_facet()
+            && let Ok(body) = peek.into_struct()
+            && let Ok(field) = body.field_by_name("n")
+            && let Ok(n) = field.get::<usize>()
+        {
+            self.0.lock().unwrap().push(*n);
+        }
+    }
+}
+
 /// The subscriber registry is a process-global `OnceLock`, installable exactly
 /// once — so every assertion that needs the global lives in this single test:
 /// fan-out to more than one subscriber, the set-once `install` contract, and
@@ -176,10 +201,14 @@ impl tracing::Subscriber for OrderTracing {
 fn subscriber_fanout_is_set_once_and_precedes_tracing() {
     let captured = Arc::new(Mutex::new(Vec::new()));
     let order = Arc::new(Mutex::new(Vec::new()));
+    #[cfg(feature = "facet")]
+    let reflected = Arc::new(Mutex::new(Vec::new()));
 
     let mut subscribers = Subscribers::default();
     subscribers.register(Box::new(Recorder(captured.clone())));
     subscribers.register(Box::new(OrderMarker(order.clone())));
+    #[cfg(feature = "facet")]
+    subscribers.register(Box::new(FacetProbe(reflected.clone())));
 
     assert!(subscribers.install().is_ok(), "first install wins");
     assert!(
@@ -197,6 +226,10 @@ fn subscriber_fanout_is_set_once_and_precedes_tracing() {
     );
 
     assert_eq!(*order.lock().unwrap(), vec!["dispatch", "record"]);
+
+    // The facet hook resolved the message's `n` field through `&dyn Message`.
+    #[cfg(feature = "facet")]
+    assert_eq!(*reflected.lock().unwrap(), vec![7]);
 }
 
 struct EventCollector(Arc<Mutex<Vec<(Level, String)>>>);
@@ -392,7 +425,8 @@ fn descriptor(msg: &str) -> &'static tracing_wide::catalogue::MessageDescriptor 
 fn catalogue_registers_message_descriptors() {
     let d = descriptor("service started");
 
-    assert_eq!(d.level, Level::WARN);
+    assert_eq!(d.level.as_str(), "WARN");
+    assert_eq!(Level::from(d.level), Level::WARN);
     assert_eq!(d.doc, Some("Emitted when a service finishes starting up."));
     assert_eq!(d.deprecated, None);
     assert!(d.meta.contains(&("owner", "platform")));
@@ -419,7 +453,7 @@ fn catalogue_registers_message_descriptors() {
     assert_eq!(legacy.deprecated, Some("fold the id into `service`"));
     assert_eq!(legacy.r#type, "Option < usize >");
 
-    assert_eq!(descriptor("Renamed").level, Level::INFO);
+    assert_eq!(Level::from(descriptor("Renamed").level), Level::INFO);
 
     assert_eq!(
         descriptor("legacy started").deprecated,
@@ -686,5 +720,108 @@ mod serialize {
         let dynamic: &dyn Message = &m;
 
         assert!(dynamic.as_serialize().is_none());
+    }
+}
+
+#[cfg(feature = "facet")]
+mod reflect {
+    use tracing_wide::{
+        Message,
+        facet::{Facet, HasFields},
+        message,
+    };
+
+    #[cfg(target_arch = "wasm32")]
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    /// Does *not* opt in — and isn't `Facet`. Proves the hook never forces a
+    /// `Facet` bound on a message that didn't ask for it.
+    #[message(msg = "opaque reflect event")]
+    #[allow(dead_code)]
+    struct Opaque {
+        n: usize,
+    }
+
+    /// Enables the reflection hook with nothing but `#[derive(Facet)]`.
+    #[message(msg = "reflectable event")]
+    #[derive(Facet)]
+    struct Reflect {
+        n: usize,
+        name: &'static str,
+    }
+
+    #[cfg_attr(not(target_arch = "wasm32"), test)]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+    fn opted_in_message_reflects_through_dyn_message() {
+        let m = Reflect {
+            n: 5,
+            name: "billing",
+        };
+
+        let dynamic: &dyn Message = &m;
+
+        let body = dynamic
+            .as_facet()
+            .expect("an opted-in message yields Some")
+            .into_struct()
+            .expect("a message is a struct");
+
+        // Read individual fields by name, with no knowledge of the concrete type.
+        assert_eq!(
+            body.field_by_name("name").unwrap().as_str(),
+            Some("billing")
+        );
+        assert_eq!(*body.field_by_name("n").unwrap().get::<usize>().unwrap(), 5);
+
+        // Full reflection: every field, in declaration order.
+        let names: Vec<&str> = body.fields().map(|(f, _)| f.name).collect();
+        assert_eq!(names, ["n", "name"]);
+    }
+
+    #[cfg_attr(not(target_arch = "wasm32"), test)]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+    fn opted_out_message_returns_none() {
+        let m = Opaque { n: 1 };
+        let dynamic: &dyn Message = &m;
+
+        assert!(dynamic.as_facet().is_none());
+    }
+}
+
+// Native-only, like the serde catalogue manifest (serde_norway / facet-json are
+// both non-wasm dev-deps): the descriptors serialize the same under both frameworks.
+#[cfg(all(
+    feature = "catalogue",
+    feature = "facet",
+    feature = "serde",
+    not(target_arch = "wasm32")
+))]
+mod catalogue_facet {
+    use tracing_wide::message;
+
+    /// Exercises every customized descriptor field: struct deprecation, field
+    /// docs, meta (map), level (name), tags, and origin (compact string).
+    #[message(msg = "facet catalogue probe", level = warn, owner = "platform", tags = ["b", "a"])]
+    #[deprecated = "demo"]
+    #[allow(dead_code)]
+    struct Probe {
+        /// A documented field.
+        #[field(unit = "ms")]
+        duration: usize,
+    }
+
+    /// The facet manifest must match the serde manifest field-for-field — the
+    /// whole point of the proxies (compact origin, map meta, level name).
+    #[test]
+    fn descriptor_serializes_identically_under_serde_and_facet() {
+        let descriptor = tracing_wide::catalogue::all()
+            .find(|d| d.msg == "facet catalogue probe")
+            .expect("Probe is registered");
+
+        let via_serde = serde_json::to_value(descriptor).unwrap();
+        let via_facet: serde_json::Value =
+            serde_json::from_str(&facet_json::to_string(descriptor).unwrap()).unwrap();
+
+        assert_eq!(via_serde, via_facet);
     }
 }

@@ -1,6 +1,6 @@
 //! Serializing messages from a subscriber.
 //!
-//! Run: `just example-serializable`
+//! Run: `just example-subscriber-serde`
 //!
 //! tracing-wide puts **no `Serialize` bound** on messages: a type opts in with
 //! `#[derive(Serialize)]` alone, and [`Message::as_serialize`] hands back an

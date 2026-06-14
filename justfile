@@ -12,10 +12,13 @@ docs:
     rm -rf target/doc
     RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps
 
-examples: example-catalogue example-instrument example-subscriber example-serializable example-tags
+examples: example-catalogue-facet example-catalogue-serde example-instrument example-subscriber example-subscriber-facet example-subscriber-serde example-tags
 
-example-catalogue:
-    cargo run --example catalogue --features catalogue,serde
+example-catalogue-facet:
+    cargo run --example catalogue-facet --features catalogue,facet
+
+example-catalogue-serde:
+    cargo run --example catalogue-serde --features catalogue,serde
 
 example-instrument:
     cargo run --example instrument --features instrument,subscriber
@@ -23,8 +26,11 @@ example-instrument:
 example-subscriber:
     cargo run --example subscriber --features subscriber
 
-example-serializable:
-    cargo run --example serializable --features subscriber,serde
+example-subscriber-facet:
+    cargo run --example subscriber-facet --features facet,subscriber
+
+example-subscriber-serde:
+    cargo run --example subscriber-serde --features subscriber,serde
 
 example-tags:
     cargo run --example tags --features subscriber

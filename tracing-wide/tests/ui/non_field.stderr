@@ -17,7 +17,7 @@ help: the trait `tracing_core::field::Value` is not implemented for `NotAValue`
             (dyn std::error::Error + Send + Sync + 'static)
             (dyn std::error::Error + Sync + 'static)
             Arguments<'_>
-            Box<T>
+            NonZero<i128>
           and $N others
   = note: required for `&NotAValue` to implement `tracing_core::field::Value`
   = note: required for the cast from `&&NotAValue` to `&dyn tracing_core::field::Value`
@@ -42,7 +42,7 @@ help: the trait `tracing_core::field::Value` is not implemented for `NotAValue`
             (dyn std::error::Error + Send + Sync + 'static)
             (dyn std::error::Error + Sync + 'static)
             Arguments<'_>
-            Box<T>
+            NonZero<i128>
           and $N others
   = note: required for `NotAValue` to implement `tracing_wide::Field`
 note: required by a bound in `__tracing_wide_assert_field`

@@ -67,9 +67,14 @@ build downstream recipients — analytics, BI, alerts — against a stable contr
 `#[message]` auto-registers one descriptor per type; `catalogue::all()` walks
 them. Each descriptor carries everything from the definitions above — `msg`,
 `level`, `tags`, `origin`, doc comments, `#[field(unit = ...)]` and other
-metadata, and deprecations (field- or struct-level). With the `serde` feature the
-descriptors `Serialize`, so a build step can dump a manifest — the `catalogue`
-example emits YAML keyed by `msg`.
+metadata, and deprecations (field- or struct-level).
+
+With the `serde` feature the descriptors `Serialize`, so a build step can dump a
+manifest — the `catalogue-serde` example emits YAML keyed by `msg`. With the
+`facet` feature they derive `Facet`, so the same manifest can be produced
+through any facet serializer — the `catalogue-facet` example emits the *same* YAML
+via `facet-yaml`. `level`, `origin`, and the `meta` maps render identically either
+way, so the two are interchangeable.
 
 - `msg` is the unique join key; `catalogue::duplicates()` flags collisions (run
   it in a test).
@@ -125,7 +130,7 @@ tracing's global default.
 > A panicking `on_message` panics the `event!` call site — same posture as
 > tracing itself, but a logging sink can crash the app.
 
-## Tags — route by intent
+### Routing on message types via Tags
 
 `RequestCompleted` is tagged `analytics` + `api`; `PaymentCaptured`, `analytics`
 + `persist`. Tags are *where to send*, not *where from*: a subscriber routes on
@@ -140,3 +145,33 @@ fn on_message(&self, m: &dyn Message) {
 Tags are sorted, deduped and lowercased at compile time, and lowercase is
 enforced. Crate-prefix namespacing is unnecessary — `origin()` already carries
 the crate.
+
+### Routing on messages data via reflect *(`facet`)*
+
+When the decision lives in the *data* (only the `eu` region, only
+payments over a threshold), it's per-event and can't be a tag. With the `facet`
+feature, `as_facet()` hands back a `facet::Peek` over the live body, so a
+subscriber reads a field *by name* and filters on its value — no downcast, no
+per-type match.
+
+```rust,ignore
+fn on_message(&self, m: &dyn Message) {
+    let Some(peek) = m.as_facet() else { return };   // Some iff the type derives Facet
+    let Ok(body) = peek.into_struct() else { return };
+
+    // pull one field out by name and filter on its live value
+    if body.field_by_name("region").ok().and_then(|f| f.as_str()) == Some("eu") {
+        // matched on data, not on a tag — and you can walk every field from here
+    }
+}
+```
+
+Reflection is opt-in per type (`#[derive(Facet)]`) and never a bound on `Message`;
+a type that doesn't derive it yields `None` — the same shape as `as_serialize`.
+Where serialization forwards the body whole, reflection pulls it apart. See the
+`subscriber-facet` example.
+
+> The `facet` feature is unstable: [facet](https://docs.rs/facet) is pre-1.0 and
+> every minor is a breaking change, so expect churn. It's re-exported as
+> `tracing_wide::facet` so a subscriber names `Peek`/`Facet` through the exact
+> version this crate compiled against.

@@ -23,6 +23,16 @@ docs-features = ["dep:document-features"]
 ## Tooling-only feature. Should neither be enabled for applications nor libraries.
 catalogue = ["dep:inventory", "std"]
 
+## Facet reflection integration. The `as_facet` hook on `Message` hands a subscriber a
+## `facet::Peek` over a live message body — enabled per type by `#[derive(Facet)]` alone
+## — for *introspection*: pull fields out by name and filter on an individual field, not
+## just on tags. Distinct from `serde`, which forwards the body whole; this pulls it apart.
+##
+## Unstable: facet is pre-1.0 and every minor is a breaking change, so this feature tracks
+## that churn — expect breakage. facet is re-exported as `tracing_wide::facet` so a
+## subscriber names `Peek`/`Facet`/the derive through one coherent version.
+facet = ["dep:facet", "std"]
+
 ## Instrument integration (ambient autocapture): a tracing-subscriber `Layer`
 ## that captures span field values — i.e. what `tracing::instrument` records —
 ## and an emit-time join that fills a message's still-`None` `Option` fields by
@@ -54,6 +64,7 @@ tracing-wide-macros.workspace = true
 
 document-features = { version = "0.2", optional = true }
 erased-serde = { version = "0.4", optional = true }
+facet = { version = "0.46", optional = true, features = ["reflect"] }
 inventory = { version = "0.3", optional = true }
 serde = { version = "1.0", optional = true, features = ["derive"] }
 tracing = { version = "0.1", default-features = false }
@@ -70,12 +81,18 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["r
 wasm-bindgen-test = "0.3"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+facet-json = "0.46"
+facet-yaml = "0.46"
 serde_norway = "0.9"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
 trybuild = "1.0"
 
 [[example]]
-name = "catalogue"
+name = "catalogue-facet"
+required-features = ["catalogue", "facet"]
+
+[[example]]
+name = "catalogue-serde"
 required-features = ["catalogue", "serde"]
 
 [[example]]
@@ -83,16 +100,20 @@ name = "instrument"
 required-features = ["instrument", "subscriber"]
 
 [[example]]
-name = "serializable"
-required-features = ["subscriber", "serde"]
-
-[[example]]
 name = "subscriber"
 required-features = ["subscriber"]
+
+[[example]]
+name = "subscriber-facet"
+required-features = ["facet", "subscriber"]
+
+[[example]]
+name = "subscriber-serde"
+required-features = ["subscriber", "serde"]
 
 [[example]]
 name = "tags"
 required-features = ["subscriber"]
 
 [package.metadata.docs.rs]
-features = ["catalogue", "docs-features", "instrument", "serde", "std", "subscriber" ]
+features = ["catalogue", "docs-features", "facet", "instrument", "serde", "std", "subscriber" ]

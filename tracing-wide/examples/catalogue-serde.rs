@@ -1,6 +1,6 @@
 //! Generate a YAML manifest from the message catalogue.
 //!
-//! Run: `just example-catalogue`
+//! Run: `just example-catalogue-serde` (see `catalogue-facet` for the facet equivalent)
 //!
 //! Walks `tracing_wide::catalogue::all()` and serializes the descriptors
 //! directly — the `serde` feature implements `Serialize` on them, so no mirror

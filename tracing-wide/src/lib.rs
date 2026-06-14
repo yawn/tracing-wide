@@ -17,6 +17,19 @@ use core::fmt;
 
 pub use tracing_wide_macros::{event, message};
 
+/// Re-export of the [`facet`](https://docs.rs/facet) crate, so a subscriber names
+/// `Peek` and the `Facet` trait through the exact version tracing-wide compiled
+/// against. facet is pre-1.0 — every minor is a breaking change — so naming it via a
+/// separate direct dependency risks a type mismatch across the `as_facet` boundary;
+/// going through `tracing_wide::facet` guarantees one version.
+///
+/// To `#[derive(Facet)]` on a message, either depend on `facet` directly (pinned to
+/// the same version), or derive through this re-export with
+/// `#[derive(tracing_wide::facet::Facet)]` + `#[facet(crate = tracing_wide::facet)]`,
+/// which needs no direct facet dependency.
+#[cfg(feature = "facet")]
+pub use ::facet;
+
 #[cfg(feature = "catalogue")]
 pub mod catalogue;
 #[cfg(feature = "instrument")]
@@ -50,7 +63,22 @@ pub trait Message: __private::MessageBehaviour {
     /// `as_any().downcast_ref::<T>()`.
     fn as_any(&self) -> &dyn Any;
 
+    /// Erased reflection hook, keyed on one knob: `#[derive(Facet)]`.
+    ///
+    /// Via [`__private::facet`] autoref specialization the generated body returns
+    /// `Some` (a [`Peek`](::facet::Peek) over `self`) when the type derives
+    /// `Facet` and `None` otherwise — no `Facet` bound ever lands on a message
+    /// that didn't derive it. The introspection parallel to
+    /// [`as_serialize`](Self::as_serialize): a subscriber walks the `Peek` to
+    /// read fields by name and filter on a field's value, which static
+    /// [`tags`](Self::tags) cannot.
+    #[cfg(feature = "facet")]
+    fn as_facet(&self) -> Option<::facet::Peek<'_, 'static>> {
+        None
+    }
+
     /// Erased serialization hook, keyed on one knob: `#[derive(Serialize)]`.
+    ///
     /// Via [`__private::serde`] autoref specialization the generated body
     /// returns `Some(self)` when the type derives `Serialize` and `None`
     /// otherwise — no `Serialize` bound ever lands on a message that didn't
@@ -90,6 +118,8 @@ pub trait Message: __private::MessageBehaviour {
 /// attribute or route a `&dyn Message` without naming the concrete type. All
 /// fields are `&'static`/`u32`, so `Origin` is `Copy` and stays `no_std`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "facet", derive(::facet::Facet))]
+#[cfg_attr(feature = "facet", facet(proxy = String))]
 pub struct Origin {
     /// Column of the definition (`column!()`).
     pub column: u32,
@@ -113,6 +143,27 @@ impl fmt::Display for Origin {
             "{} {}:{}:{}",
             self.krate, self.file, self.line, self.column
         )
+    }
+}
+
+/// Facet serializes `Origin` through its compact `Display` string (the `proxy`),
+/// matching the serde manifest. Serialize-only — provenance is never parsed back,
+/// so the reverse conversion is a stub.
+// Infallible, but facet's `proxy` mechanism is defined in terms of `TryFrom`.
+#[cfg(feature = "facet")]
+#[allow(clippy::infallible_try_from)]
+impl TryFrom<&Origin> for String {
+    type Error = core::convert::Infallible;
+    fn try_from(origin: &Origin) -> Result<Self, Self::Error> {
+        Ok(origin.to_string())
+    }
+}
+
+#[cfg(feature = "facet")]
+impl TryFrom<String> for Origin {
+    type Error = &'static str;
+    fn try_from(_: String) -> Result<Self, Self::Error> {
+        Err("Origin is serialize-only in the catalogue")
     }
 }
 
@@ -140,6 +191,31 @@ macro_rules! __register_message {
 #[macro_export]
 macro_rules! __register_message {
     ($desc:expr) => {};
+}
+
+/// `#[message]`-internal: emit the `Message::as_facet` override, or not.
+/// Cfg-selected by *tracing-wide's* `facet` feature. Every message gets the
+/// same body — `Some(Peek::new(self))` iff `Self: Facet`, decided at the call
+/// site by [`__private::facet`] autoref specialization; `#[derive(Facet)]` is
+/// the only knob.
+#[cfg(feature = "facet")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __message_facet_method {
+    () => {
+        fn as_facet(&self) -> ::core::option::Option<$crate::__private::facet::Peek<'_, 'static>> {
+            #[allow(unused_imports)]
+            use $crate::__private::facet::{ViaFacet as _, ViaNotFacet as _};
+            (&$crate::__private::facet::Probe::new(self)).__tracing_wide_as_facet()
+        }
+    };
+}
+
+#[cfg(not(feature = "facet"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __message_facet_method {
+    () => {};
 }
 
 /// `#[message]`-internal: emit the `MessageBehaviour::join_ambient` override,
@@ -260,6 +336,44 @@ pub mod __private {
     /// too. It catches accidents, not deliberate reach-through, which stays
     /// unsupported.
     pub trait Sealed {}
+
+    /// Autoref specialization for the `__message_facet_method!` shim —
+    /// `Some(Peek::new(self))` iff `Self: Facet<'static>` — plus the `Peek`
+    /// re-export the shim names. The module is deliberately named `facet`; the
+    /// `::facet` bound below names the crate absolutely.
+    #[cfg(feature = "facet")]
+    pub mod facet {
+        use ::facet::Facet;
+        pub use ::facet::Peek;
+
+        pub struct Probe<'a, T>(&'a T);
+
+        pub trait ViaFacet<'a> {
+            fn __tracing_wide_as_facet(&self) -> Option<Peek<'a, 'static>>;
+        }
+
+        pub trait ViaNotFacet<'a> {
+            fn __tracing_wide_as_facet(&self) -> Option<Peek<'a, 'static>>;
+        }
+
+        impl<'a, T> Probe<'a, T> {
+            pub fn new(value: &'a T) -> Self {
+                Probe(value)
+            }
+        }
+
+        impl<'a, T: Facet<'static>> ViaFacet<'a> for Probe<'a, T> {
+            fn __tracing_wide_as_facet(&self) -> Option<Peek<'a, 'static>> {
+                Some(Peek::new(self.0))
+            }
+        }
+
+        impl<'a, T> ViaNotFacet<'a> for &Probe<'a, T> {
+            fn __tracing_wide_as_facet(&self) -> Option<Peek<'a, 'static>> {
+                None
+            }
+        }
+    }
 
     /// Autoref specialization for the `__message_ambient_method!` shim —
     /// deciding per inner type whether a

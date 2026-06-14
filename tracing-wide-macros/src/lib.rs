@@ -534,6 +534,7 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
         #allow_deprecated
         impl ::tracing_wide::Message for #name {
             fn as_any(&self) -> &dyn ::core::any::Any { self }
+            ::tracing_wide::__message_facet_method! {}
             ::tracing_wide::__message_serialize_method! {}
             fn level(&self) -> ::tracing_wide::__private::tracing::Level { Self::LEVEL }
             fn msg(&self) -> &'static str { Self::MSG }
@@ -550,7 +551,7 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
                 deprecated: #msg_deprecation,
                 doc: #msg_doc,
                 fields: &[ #( #fields ),* ],
-                level: ::tracing_wide::__private::tracing::Level::#level_const,
+                level: ::tracing_wide::catalogue::LevelName::#level_const,
                 meta: #msg_meta,
                 msg: #msg,
                 origin: #name::ORIGIN,
