@@ -1,0 +1,44 @@
+name: Zizmor
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/**
+      - .github/zizmor.yml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  zizmor:
+    name: Zizmor
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa # v0.5.7
+        with:
+          # Strictest persona — enables auditor-only audits, notably
+          # ref-version-mismatch, which warns when a pinned SHA drifts from
+          # its `# vN` comment.
+          persona: auditor
+          # This repo is public, so Advanced Security/SARIF upload is available;
+          # we still prefer inline annotations + a red job (self-contained gate,
+          # no code-scanning ruleset needed). Flip both to enable SARIF instead.
+          advanced-security: false
+          annotations: true
+        env:
+          # ref-version-mismatch resolves tags via the GitHub API.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

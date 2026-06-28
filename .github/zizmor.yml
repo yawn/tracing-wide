@@ -1,0 +1,17 @@
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        # Require a full commit SHA for EVERY `uses:` — first-party actions/*,
+        # third-party actions, and reusable workflows alike. Matches zizmor's
+        # >=1.20 default, pinned explicitly so the default can't loosen us later.
+        "*": hash-pin
+
+  # We deliberately use dtolnay/rust-toolchain rather than scripting rustup: it
+  # honours the toolchain pin (over rust-toolchain.toml's "stable"), installs
+  # components, and adds the wasm target declaratively. auditor's
+  # superfluous-actions would have us inline rustup calls instead — not a
+  # trade we want. (mono doesn't hit this; it drives everything through mise.)
+  superfluous-actions:
+    ignore:
+      - ci.yml
