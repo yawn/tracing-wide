@@ -537,7 +537,7 @@ dependencies = [
 
 [[package]]
 name = "integration-test-crate"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "tracing-wide",
 ]
@@ -1102,7 +1102,7 @@ dependencies = [
 
 [[package]]
 name = "tracing-wide"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "document-features",
  "erased-serde",
@@ -1124,7 +1124,7 @@ dependencies = [
 
 [[package]]
 name = "tracing-wide-macros"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "prettyplease",
  "proc-macro2",
