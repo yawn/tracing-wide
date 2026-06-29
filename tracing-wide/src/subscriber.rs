@@ -3,11 +3,29 @@
 //! Gated by the `subscriber` feature — without it, `event!` just records to
 //! tracing and the core stays free of global state.
 
-use std::sync::OnceLock;
+use core::cell::RefCell;
+use std::sync::{Arc, OnceLock};
 
 use crate::Message;
 
 static SUBSCRIBERS: OnceLock<Subscribers> = OnceLock::new();
+
+thread_local! {
+    /// The thread-local scoped set, mirroring tracing's `set_default`.
+    ///
+    /// When set, it *replaces* the global [`SUBSCRIBERS`] for this thread
+    /// for as long as a [`DefaultGuard`] is held; cleared (restored to
+    /// the previous scope) on the guard's drop.
+    ///
+    /// `Arc` so [`dispatch`] can lift the set out of the cell and
+    /// release the borrow *before* fanning out — a subscriber that itself emits
+    /// would otherwise re-enter and double-borrow.
+    static SCOPED: RefCell<Option<Arc<Subscribers>>> = const { RefCell::new(None) };
+}
+
+/// Restores the previous thread-local scope on drop.
+#[must_use = "dropping the guard immediately ends the scope"]
+pub struct DefaultGuard(Option<Arc<Subscribers>>);
 
 /// A runtime-installed sink. Downcast via [`Message::as_any`] to the concrete
 /// type; serialization is the subscriber's concern, never a bound here.
@@ -36,16 +54,46 @@ impl Subscribers {
         SUBSCRIBERS.set(self)
     }
 
-    /// Add a subscriber to the set. Call before [`install`](Self::install).
+    /// Add a subscriber to the set. Call before [`install`](Self::install) or
+    /// before scoping the set with [`set_default`](Self::set_default) /
+    /// [`with_default`](Self::with_default).
     pub fn register(&mut self, subscriber: Box<dyn Subscriber>) {
         self.0.push(subscriber);
     }
+
+    /// Set this set as the calling thread's subscribers for as long as the
+    /// returned guard lives.
+    pub fn set_default(self) -> DefaultGuard {
+        let previous = SCOPED.with(|cell| cell.borrow_mut().replace(Arc::new(self)));
+        DefaultGuard(previous)
+    }
+
+    /// Run `f` with this set as the calling thread's scoped set, restoring the
+    /// previous scope afterward — the typed analogue of tracing's
+    /// [`with_default`](tracing::subscriber::with_default).
+    pub fn with_default<T>(self, f: impl FnOnce() -> T) -> T {
+        let _guard = self.set_default();
+        f()
+    }
 }
 
-/// Fan a message out to the installed subscribers; a no-op until `install`.
-/// Called by the `emit` path — reading the `OnceLock` never blocks or poisons.
+impl Drop for DefaultGuard {
+    fn drop(&mut self) {
+        SCOPED.with(|cell| {
+            *cell.borrow_mut() = self.0.take();
+        });
+    }
+}
+
+/// Fan a message out to the active subscribers: the calling thread's scoped set
+/// if one is held (see [`set_default`](Subscribers::set_default)), else the
+/// global [`install`](Subscribers::install)ed set, else a no-op.
 pub(crate) fn dispatch(msg: &dyn Message) {
-    if let Some(subscribers) = SUBSCRIBERS.get() {
+    if let Some(subscribers) = SCOPED
+        .with(|cell| cell.borrow().clone())
+        .as_deref()
+        .or_else(|| SUBSCRIBERS.get())
+    {
         subscribers.dispatch(msg);
     }
 }
