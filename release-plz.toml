@@ -1,11 +1,8 @@
 # release-plz configuration — https://release-plz.dev/docs/config
 [workspace]
-# CHANGELOG.md is hand-written (curated prose), so release-plz must not touch
-# it. The release PR only bumps versions + the macros `=` pin.
 changelog_update = false
-# Guard the bump with cargo-semver-checks: a breaking API change forces the
-# correct (pre-1.0: minor) bump even when the commit wasn't marked breaking.
 semver_check = true
+git_release_enable = false
 
 # tracing-wide and tracing-wide-macros are one unit (the `=` pin between them):
 # always the same version, always bumped and released together.
