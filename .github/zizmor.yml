@@ -15,3 +15,4 @@ rules:
   superfluous-actions:
     ignore:
       - ci.yml
+      - release.yml

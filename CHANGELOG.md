@@ -8,6 +8,8 @@ Pre-1.0, a breaking change bumps the minor version.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-29
+
 ### Added
 
 - `facet` feature: the `Message::as_facet` reflection hook, opt-in per type via
@@ -21,6 +23,10 @@ Pre-1.0, a breaking change bumps the minor version.
   be produced with any facet serializer: `level`, `origin`, and the `meta` maps
   render identically to the serde output. New example `catalogue-facet`.
 - Example `subscriber-facet`, filtering on a message field's value via reflection.
+- Thread-local scoped subscribers: `Subscribers::set_default` (returning a
+  `DefaultGuard`) and `with_default`, mirroring `tracing`'s own scoped-dispatch
+  API. While a guard is held, the calling thread fans out to that set instead of
+  the globally `install`ed one - useful for tests and per-thread routing.
 
 ### Changed
 
@@ -33,5 +39,6 @@ Pre-1.0, a breaking change bumps the minor version.
 
 Initial release.
 
-[Unreleased]: https://github.com/yawn/tracing-wide/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/yawn/tracing-wide/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/yawn/tracing-wide/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yawn/tracing-wide/releases/tag/v0.1.0
