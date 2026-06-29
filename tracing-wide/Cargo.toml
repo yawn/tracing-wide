@@ -15,7 +15,11 @@ version.workspace = true
 
 [features]
 default = [ "std" ]
-docs-features = ["dep:document-features"]
+
+## Documentation-only: pulls in every dependency and rendering needed to build
+## the full rustdoc (currently `document-features`, which renders this list).
+## Enabled by docs.rs and `just docs`; never needed by applications or libraries.
+docs = ["dep:document-features"]
 
 ## Auto-collected per-type catalogue: inventory registration + descriptors. On its
 ## own the descriptors are plain data; add `serde` and they gain `Serialize`.
@@ -86,6 +90,7 @@ facet-yaml = "0.46"
 serde_norway = "0.9"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
 trybuild = "1.0"
+trycmd = "1.2"
 
 [[example]]
 name = "catalogue-facet"
@@ -116,4 +121,4 @@ name = "tags"
 required-features = ["subscriber"]
 
 [package.metadata.docs.rs]
-features = ["catalogue", "docs-features", "facet", "instrument", "serde", "std", "subscriber" ]
+features = ["catalogue", "docs", "facet", "instrument", "serde", "std", "subscriber" ]

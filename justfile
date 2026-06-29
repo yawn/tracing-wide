@@ -1,4 +1,5 @@
-HACK := "cargo hack --feature-powerset --exclude-features default,docs-features,std -p tracing-wide"
+HACK := "cargo hack --feature-powerset --exclude-features default,docs,std -p tracing-wide"
+TESTS := "--test core --test subscriber --test catalogue --test instrument --test serde --test facet --test cross_crate"
 
 check: check-native check-wasm
 
@@ -7,6 +8,9 @@ check-native:
 
 check-wasm:
     {{HACK}} check --target wasm32-unknown-unknown
+
+clippy:
+    cargo clippy --workspace --all-features --all-targets -- -D warnings
 
 docs:
     rm -rf target/doc
@@ -40,20 +44,18 @@ lint: fmt-check clippy
 fmt-check:
     cargo fmt --all --check
 
-clippy:
-    cargo clippy --workspace --all-features --all-targets -- -D warnings
+test: test-examples test-native test-wasm
 
-test: test-native test-wasm
+test-examples: # set TRYCMD=overwrite when examples have changed
+    cargo test -p tracing-wide --test examples
 
 test-native:
-    {{HACK}} test --test coverage --test cross_crate
-    # Targets the powerset can't reach, run once at --all-features (mirrors mise's
-    # old `cargo test --workspace --all-features`): lib unit tests (the host-only
-    # macro-internal tests), doctests (`--doc` is exclusive of `--test`), and the
-    # `ui` trybuild suite (native-only, rustc-version-sensitive).
+    cargo test -p tracing-wide --no-default-features {{TESTS}}
+    cargo test -p tracing-wide --all-features {{TESTS}}
     cargo test --workspace --all-features --lib
     cargo test --workspace --all-features --doc
     cargo test -p tracing-wide --all-features --test ui
 
 test-wasm:
-    {{HACK}} test --test coverage --test cross_crate --target wasm32-unknown-unknown
+    cargo test -p tracing-wide --no-default-features {{TESTS}} --target wasm32-unknown-unknown
+    cargo test -p tracing-wide --all-features {{TESTS}} --target wasm32-unknown-unknown

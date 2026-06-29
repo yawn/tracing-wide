@@ -5,7 +5,7 @@
 //! # Feature flags
 //!
 #![cfg_attr(
-    feature = "docs-features",
+    feature = "docs",
     cfg_attr(doc, doc = ::document_features::document_features!())
 )]
 // The bare core (define + emit) uses only `core`; `std` — and every feature
@@ -16,6 +16,9 @@ use core::any::Any;
 use core::fmt;
 
 pub use tracing_wide_macros::{event, message};
+
+#[cfg(doc)]
+pub mod examples;
 
 /// Re-export of the [`facet`](https://docs.rs/facet) crate, so a subscriber names
 /// `Peek` and the `Facet` trait through the exact version tracing-wide compiled

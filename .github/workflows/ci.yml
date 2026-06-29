@@ -55,13 +55,16 @@ jobs:
         with:
           tool: just,cargo-hack
       - run: rustc --version
+      # Powerset compile-coverage of every feature combo; the test runs below
+      # only exercise the no-default / all-features ends of the matrix.
+      - run: just check-native
       - run: just test-native
       # trybuild's `ui` suite leaves a nested target tree under target/tests that
       # rust-cache's post-step cleanup trips over (ENOENT opendir). Drop it here;
-      # the docs/examples steps below don't need it.
+      # the docs / test-examples steps below don't need it.
       - run: rm -rf target/tests
       - run: just docs
-      - run: just examples
+      - run: just test-examples
 
   wasm:
     name: test (wasm32)
@@ -79,4 +82,5 @@ jobs:
       - uses: taiki-e/install-action@bffeee26d4db9be238a4ea78d8826604ebcb594d # v2.82.5
         with:
           tool: just,cargo-hack,wasm-bindgen-cli@0.2.122
+      - run: just check-wasm
       - run: just test-wasm

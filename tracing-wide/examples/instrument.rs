@@ -71,7 +71,10 @@ fn main() {
 
     let subscriber = tracing_subscriber::registry()
         .with(tracing_wide::instrument::layer())
-        .with(tracing_subscriber::fmt::layer());
+        // `.without_time()`: the wall-clock timestamp is the one non-deterministic
+        // bit of this example's output, and it's documented verbatim (README +
+        // rustdoc), so drop it to keep the snapshot stable.
+        .with(tracing_subscriber::fmt::layer().without_time());
 
     tracing::subscriber::set_global_default(subscriber).expect("first subscriber");
 
