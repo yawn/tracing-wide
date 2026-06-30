@@ -1,7 +1,9 @@
 name: Release
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
 
 permissions: {}
@@ -12,6 +14,7 @@ jobs:
   release-pr:
     name: release-plz PR
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: write # push the release-PR branch
       pull-requests: write # open/update the release PR
@@ -21,6 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
+          ref: ${{ github.event.workflow_run.head_sha }} # the commit CI validated
           fetch-depth: 0
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
@@ -38,6 +42,7 @@ jobs:
   release:
     name: release-plz release
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: write # push the tag + create the GitHub Release
       pull-requests: read # detect the merged release PR
@@ -48,6 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
+          ref: ${{ github.event.workflow_run.head_sha }} # the commit CI validated
           fetch-depth: 0
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
