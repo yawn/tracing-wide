@@ -16,3 +16,11 @@ rules:
     ignore:
       - ci.yml
       - release.yml
+
+  # release.yml is workflow_run-triggered to gate releases on CI. The trigger is
+  # the whole point and can't be avoided; we mitigate the privilege-escalation
+  # risk it warns about with an `event == 'push'` guard on every job (rejecting
+  # fork-PR-triggered CI runs) — see the comment there. The heuristic can't see that.
+  dangerous-triggers:
+    ignore:
+      - release.yml

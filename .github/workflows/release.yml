@@ -14,7 +14,11 @@ jobs:
   release-pr:
     name: release-plz PR
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # event == 'push' is a security guard, not a convenience: workflow_run runs
+    # with write + crates.io OIDC creds, and `branches: [main]` matches the head
+    # *branch* — a fork PR from a branch named "main" would otherwise satisfy it.
+    # Fork-PR CI carries event 'pull_request'; only base-repo pushes are 'push'.
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
     permissions:
       contents: write # push the release-PR branch
       pull-requests: write # open/update the release PR
@@ -42,7 +46,7 @@ jobs:
   release:
     name: release-plz release
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
     permissions:
       contents: write # push the tag + create the GitHub Release
       pull-requests: read # detect the merged release PR
