@@ -12,6 +12,7 @@ mod common;
 use std::sync::{Arc, Mutex};
 
 use common::{KvGrab, Renamed, Started};
+use seq_macro::seq;
 use tracing::Level;
 use tracing_wide::{Message, event, message};
 
@@ -42,6 +43,49 @@ struct MessageGrab(Option<String>);
 struct Plain {
     code: usize,
 }
+
+seq!(N in 0..40 {
+    /// Just past the 32 fields tracing's docs still claim as the limit.
+    #[message(msg = "narrow wide event")]
+    struct Narrower {
+        #( f~N: usize, )*
+    }
+
+    impl Narrower {
+        fn seeded() -> Self {
+            Self { #( f~N: N, )* }
+        }
+    }
+});
+
+seq!(N in 0..100 {
+    /// A very wide event, with recursion headroom to spare.
+    #[message(msg = "wide event")]
+    struct Wider {
+        #( f~N: usize, )*
+    }
+
+    impl Wider {
+        fn seeded() -> Self {
+            Self { #( f~N: N, )* }
+        }
+    }
+});
+
+seq!(N in 0..117 {
+    /// One field below the widest `seq!`-defined message that compiles at
+    /// rustc's default `recursion_limit`.
+    #[message(msg = "ceiling wide event")]
+    struct EvenWider {
+        #( f~N: usize, )*
+    }
+
+    impl EvenWider {
+        fn seeded() -> Self {
+            Self { #( f~N: N, )* }
+        }
+    }
+});
 
 impl tracing::Subscriber for EventCollector {
     fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
@@ -188,6 +232,53 @@ fn emit_records_a_braced_msg_verbatim() {
 
     let got = log.lock().unwrap();
     assert_eq!(*got, vec![(Level::INFO, "rate {limit} hit".to_string())]);
+}
+
+/// Each rung of the width ladder records every one of its fields. See the note
+/// on the fixtures for why 117 is the ceiling and what breaks if it moves.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn emit_records_every_field_of_a_message_wider_than_the_documented_limit() {
+    /// Asserts a single recorded event carries exactly `width` indexed fields plus
+    /// `message`, each `fN` holding the value `N`.
+    fn assert_round_trip(events: &[Vec<(String, String)>], width: usize, msg: &str) {
+        assert_eq!(events.len(), 1);
+
+        let fields = &events[0];
+
+        for i in 0..width {
+            let expected = (format!("f{i}"), i.to_string());
+            assert!(
+                fields.contains(&expected),
+                "field {expected:?} is missing from a {width}-field event"
+            );
+        }
+
+        // Every field plus the static message text, and nothing else: a truncating
+        // expansion would drop fields, a duplicating one would add them.
+        assert_eq!(fields.len(), width + 1);
+        assert!(fields.contains(&("message".to_string(), msg.to_string())));
+    }
+
+    let collect = |emit: &dyn Fn()| {
+        let events = Arc::new(Mutex::new(Vec::new()));
+        tracing::subscriber::with_default(FieldCollector(events.clone()), emit);
+        Arc::try_unwrap(events).unwrap().into_inner().unwrap()
+    };
+
+    assert_round_trip(
+        &collect(&|| event!(Narrower::seeded())),
+        40,
+        "narrow wide event",
+    );
+
+    assert_round_trip(&collect(&|| event!(Wider::seeded())), 100, "wide event");
+
+    assert_round_trip(
+        &collect(&|| event!(EvenWider::seeded())),
+        117,
+        "ceiling wide event",
+    );
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), test)]

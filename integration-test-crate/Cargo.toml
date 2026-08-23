@@ -5,4 +5,5 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+seq-macro = "0.3"
 tracing-wide = { path = "../tracing-wide", default-features = false }
