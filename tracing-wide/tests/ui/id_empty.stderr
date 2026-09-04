@@ -1,0 +1,5 @@
+error: `id` must not be empty
+ --> tests/ui/id_empty.rs:2:41
+  |
+2 | #[tracing_wide::message(msg = "x", id = "")]
+  |                                         ^^

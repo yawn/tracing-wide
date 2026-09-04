@@ -1,0 +1,5 @@
+error: duplicate metadata key `owner`
+ --> tests/ui/meta_duplicate_key.rs:2:49
+  |
+2 | #[tracing_wide::message(msg = "x", owner = "a", owner = "b")]
+  |                                                 ^^^^^

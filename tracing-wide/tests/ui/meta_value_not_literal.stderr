@@ -1,0 +1,5 @@
+error: metadata values must be literals (str/int/bool/float)
+ --> tests/ui/meta_value_not_literal.rs:2:44
+  |
+2 | #[tracing_wide::message(msg = "x", owner = SOME_CONST)]
+  |                                            ^^^^^^^^^^

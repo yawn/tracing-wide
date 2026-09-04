@@ -1,0 +1,5 @@
+error: `msg` must not be empty
+ --> tests/ui/msg_empty.rs:2:31
+  |
+2 | #[tracing_wide::message(msg = "")]
+  |                               ^^

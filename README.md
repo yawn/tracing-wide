@@ -20,7 +20,7 @@ Highlights include:
 - Flexible serialization: none, `serde`, or `facet`; opt-in per type, never a
   bound on `Message`.
 - Catalogue: every linked-in message type, auto-registered and walkable as plain
-  data; serialize it into a manifest keyed by `msg` and test it for duplicates.
+  data; serialize it into a manifest keyed by the resolved `id` and test it for duplicates.
 - Automatic origin: crate / module / file / line / column captured per
   message, object-safe and drift-free.
 - Ambient autocapture: `Option` fields fill at emit time from same-named

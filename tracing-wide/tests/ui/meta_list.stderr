@@ -1,0 +1,5 @@
+error: expected `key = value` or a bare flag, not a list
+ --> tests/ui/meta_list.rs:2:36
+  |
+2 | #[tracing_wide::message(msg = "x", owner(platform))]
+  |                                    ^^^^^

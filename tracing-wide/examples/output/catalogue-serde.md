@@ -1,6 +1,19 @@
 ```console
 $ cargo run -q --example catalogue-serde --features catalogue,serde
 messages:
+  billing.payment_charged:
+    doc: Recorded when a customer is charged; the explicit `id` keeps the key stable when the text changes.
+    fields:
+    - meta:
+        unit: cents
+      name: amount
+      type: usize
+    level: INFO
+    meta:
+      owner: billing
+    origin: tracing-wide tracing-wide/examples/catalogue-serde.rs:12:8
+    tags:
+    - billing
   request completed:
     doc: Recorded when a request finishes handling.
     fields:
@@ -14,7 +27,7 @@ messages:
     level: INFO
     meta:
       owner: api
-    origin: tracing-wide tracing-wide/examples/catalogue-serde.rs:12:8
+    origin: tracing-wide tracing-wide/examples/catalogue-serde.rs:20:8
     tags:
     - api
   service started:
@@ -33,12 +46,13 @@ messages:
     level: WARN
     meta:
       owner: platform
-    origin: tracing-wide tracing-wide/examples/catalogue-serde.rs:22:8
+    origin: tracing-wide tracing-wide/examples/catalogue-serde.rs:30:8
     tags:
     - platform
     - startup
 tags:
 - api
+- billing
 - platform
 - startup
 

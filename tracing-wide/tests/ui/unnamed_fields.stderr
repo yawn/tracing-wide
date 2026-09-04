@@ -1,0 +1,5 @@
+error: #[message] requires named fields
+ --> tests/ui/unnamed_fields.rs:3:8
+  |
+3 | struct M(usize);
+  |        ^

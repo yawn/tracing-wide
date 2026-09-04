@@ -1,0 +1,5 @@
+error: metadata keys must be identifiers
+ --> tests/ui/meta_key_not_ident.rs:2:36
+  |
+2 | #[tracing_wide::message(msg = "x", a::b = "c")]
+  |                                    ^^^^

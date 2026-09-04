@@ -1,7 +1,7 @@
 //! The catalogue: one descriptor per message type, registered by `#[message]` (feature `catalogue`).
 
 use core::any::TypeId;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use tracing::Level;
 
@@ -61,6 +61,11 @@ pub struct MessageDescriptor {
     #[cfg_attr(feature = "facet", facet(skip_serializing_if = Option::is_none))]
     pub doc: Option<&'static str>,
     pub fields: &'static [FieldDescriptor],
+    /// The explicit `#[message(id = "...")]`, if any; not serialized, because the manifest keys its entries by
+    /// [`resolved_id`](Self::resolved_id).
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "facet", facet(skip))]
+    pub id: Option<&'static str>,
     /// Severity, recorded as its canonical name: see [`LevelName`].
     pub level: LevelName,
     /// The pairs of `#[message(key = ...)]` other than `msg`, `level`, and `tags`, serialized as a map.
@@ -70,7 +75,7 @@ pub struct MessageDescriptor {
     )]
     #[cfg_attr(feature = "facet", facet(proxy = MetaMap, skip_serializing_if = pairs_empty))]
     pub meta: &'static [(&'static str, &'static str)],
-    /// The unique join key; not serialized, because a serialized catalogue keys its entries by it.
+    /// The event text and the fallback id; not serialized, because the manifest keys its entries by the resolved id.
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "facet", facet(skip))]
     pub msg: &'static str,
@@ -85,6 +90,13 @@ pub struct MessageDescriptor {
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "facet", facet(skip))]
     pub type_id: TypeId,
+}
+
+impl MessageDescriptor {
+    /// The explicit [`id`](Self::id), else [`msg`](Self::msg): the value of [`Message::id`](crate::Message::id).
+    pub fn resolved_id(&self) -> &'static str {
+        self.id.unwrap_or(self.msg)
+    }
 }
 
 impl LevelName {
@@ -177,25 +189,33 @@ pub fn all() -> impl Iterator<Item = &'static MessageDescriptor> {
     inventory::iter::<MessageDescriptor>.into_iter()
 }
 
-/// The `msg` values that more than one message type registers; must be empty. Check it in an application test:
+/// The resolved ids that more than one message type claims, each with its descriptors; must be empty. Check it in an
+/// application test:
 ///
 /// ```ignore
-/// assert_eq!(tracing_wide::catalogue::duplicates(), Vec::<&str>::new());
+/// let dupes = tracing_wide::catalogue::duplicates();
+/// assert!(dupes.is_empty(), "{dupes:#?}");
 /// ```
-pub fn duplicates() -> Vec<&'static str> {
-    let mut counts = HashMap::new();
+///
+/// The map is ordered by id, and each list by definition site.
+pub fn duplicates() -> BTreeMap<&'static str, Vec<&'static MessageDescriptor>> {
+    let mut by_id: BTreeMap<&'static str, Vec<&'static MessageDescriptor>> = BTreeMap::new();
     for descriptor in all() {
-        *counts.entry(descriptor.msg).or_insert(0_usize) += 1;
+        by_id
+            .entry(descriptor.resolved_id())
+            .or_default()
+            .push(descriptor);
     }
 
-    let mut keys: Vec<&'static str> = counts
-        .into_iter()
-        .filter_map(|(msg, count)| (count > 1).then_some(msg))
-        .collect();
+    by_id.retain(|_, descriptors| descriptors.len() > 1);
 
-    keys.sort_unstable();
+    // Link order varies between builds; `msg` breaks ties within one `macro_rules!` expansion.
+    for descriptors in by_id.values_mut() {
+        descriptors
+            .sort_unstable_by_key(|d| (d.origin.file, d.origin.line, d.origin.column, d.msg));
+    }
 
-    keys
+    by_id
 }
 
 inventory::collect!(MessageDescriptor);

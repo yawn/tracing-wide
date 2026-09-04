@@ -6,6 +6,14 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use tracing_wide::{catalogue::MessageDescriptor, message};
 
+/// Recorded when a customer is charged; the explicit `id` keeps the key stable when the text changes.
+#[message(msg = "payment charged", id = "billing.payment_charged", owner = "billing", tags = ["billing"])]
+#[derive(Default)]
+struct PaymentCharged {
+    #[field(unit = "cents")]
+    amount: usize,
+}
+
 /// Recorded when a request finishes handling.
 #[message(msg = "request completed", level = info, owner = "api", tags = ["api"])]
 #[derive(Default)]
@@ -35,15 +43,18 @@ fn main() {
         tags: BTreeSet<&'static str>,
     }
 
-    // A keyed manifest needs unique `msg` keys; an app checks this in a test or a catalogue binary.
-    assert_eq!(
-        tracing_wide::catalogue::duplicates(),
-        Vec::<&str>::new(),
-        "duplicate `msg` keys in the catalogue"
+    // A keyed manifest needs unique ids; an app checks this in a test or a catalogue binary.
+    let dupes = tracing_wide::catalogue::duplicates();
+
+    assert!(
+        dupes.is_empty(),
+        "duplicate ids in the catalogue: {dupes:#?}"
     );
 
     let messages: BTreeMap<&'static str, &'static MessageDescriptor> =
-        tracing_wide::catalogue::all().map(|d| (d.msg, d)).collect();
+        tracing_wide::catalogue::all()
+            .map(|d| (d.resolved_id(), d))
+            .collect();
 
     let tags: BTreeSet<&'static str> = tracing_wide::catalogue::all()
         .flat_map(|d| d.tags.iter().copied())
