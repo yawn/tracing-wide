@@ -1,0 +1,5 @@
+error: `tags` must be an array of string literals, e.g. `tags = ["analytics"]`
+ --> tests/ui/tags_not_array.rs:2:43
+  |
+2 | #[tracing_wide::message(msg = "x", tags = "security")]
+  |                                           ^^^^^^^^^^

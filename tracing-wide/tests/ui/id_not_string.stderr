@@ -1,0 +1,5 @@
+error: `id` must be a string literal
+ --> tests/ui/id_not_string.rs:2:30
+  |
+2 | #[tracing_wide::message(id = 5)]
+  |                              ^

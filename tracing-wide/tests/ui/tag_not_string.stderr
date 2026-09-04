@@ -1,0 +1,5 @@
+error: each tag must be a string literal
+ --> tests/ui/tag_not_string.rs:2:44
+  |
+2 | #[tracing_wide::message(msg = "x", tags = [1])]
+  |                                            ^

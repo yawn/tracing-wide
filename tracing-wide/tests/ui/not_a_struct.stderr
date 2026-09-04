@@ -1,0 +1,5 @@
+error: #[message] can only be applied to structs
+ --> tests/ui/not_a_struct.rs:3:6
+  |
+3 | enum M {
+  |      ^

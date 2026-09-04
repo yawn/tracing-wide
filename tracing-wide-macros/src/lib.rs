@@ -366,7 +366,8 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
     }
 
     let mut msg: Option<String> = None;
-    let mut level: Option<String> = None;
+    let mut id: Option<String> = None;
+    let mut level: Option<(Ident, Ident)> = None;
     let mut tags = Tags::default();
     let mut msg_meta = MetaPairs::default();
 
@@ -381,39 +382,10 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
                      (serialization is enabled by `#[derive(Serialize)]`)",
                 ));
             }
-            Meta::NameValue(nv) if nv.path.is_ident("msg") => {
-                if let Expr::Lit(ExprLit {
-                    lit: Lit::Str(s), ..
-                }) = &nv.value
-                {
-                    msg = Some(s.value());
-                } else {
-                    return Err(Error::new_spanned(
-                        &nv.value,
-                        "`msg` must be a string literal",
-                    ));
-                }
-            }
-            Meta::NameValue(nv) if nv.path.is_ident("level") => {
-                let lvl = match &nv.value {
-                    Expr::Path(p) if p.path.get_ident().is_some() => {
-                        p.path.get_ident().unwrap().to_string()
-                    }
-                    Expr::Lit(ExprLit {
-                        lit: Lit::Str(s), ..
-                    }) => s.value(),
-                    _ => {
-                        return Err(Error::new_spanned(
-                            &nv.value,
-                            "`level` must be one of trace/debug/info/warn/error",
-                        ));
-                    }
-                };
-                level = Some(lvl);
-            }
-            Meta::NameValue(nv) if nv.path.is_ident("tags") => {
-                tags = Tags::parse(&nv.value)?;
-            }
+            Meta::NameValue(nv) if nv.path.is_ident("msg") => msg = Some(parse_msg(&nv)?),
+            Meta::NameValue(nv) if nv.path.is_ident("id") => id = Some(parse_id(&nv)?),
+            Meta::NameValue(nv) if nv.path.is_ident("level") => level = Some(parse_level(&nv)?),
+            Meta::NameValue(nv) if nv.path.is_ident("tags") => tags = Tags::parse(&nv.value)?,
             Meta::NameValue(nv) => msg_meta.push(&nv)?,
             Meta::List(l) => {
                 return Err(Error::new_spanned(
@@ -424,6 +396,13 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
         }
     }
     let msg = msg.unwrap_or_else(|| name.to_string());
+
+    // Resolution chain: explicit `id` → `msg` → type name (the latter folded
+    // into `msg` above). The raw `Option` is preserved in the descriptor so an
+    // app can enforce "must carry an explicit id" policies; `ID`/`Message::id`
+    // expose the resolved value.
+    let id_raw = option_str(&id);
+    let resolved_id = id.clone().unwrap_or_else(|| msg.clone());
 
     // tracing's macros treat the trailing literal as a format string; escape
     // braces so a `msg` containing `{`/`}` records verbatim instead of
@@ -442,19 +421,8 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
         quote! {}
     };
 
-    let (level_const, level_macro) = match level.as_deref().unwrap_or("info") {
-        "trace" => (format_ident!("TRACE"), format_ident!("trace")),
-        "debug" => (format_ident!("DEBUG"), format_ident!("debug")),
-        "info" => (format_ident!("INFO"), format_ident!("info")),
-        "warn" => (format_ident!("WARN"), format_ident!("warn")),
-        "error" => (format_ident!("ERROR"), format_ident!("error")),
-        other => {
-            return Err(Error::new_spanned(
-                &name,
-                format!("unknown level `{other}` (expected trace/debug/info/warn/error)"),
-            ));
-        }
-    };
+    let (level_const, level_macro) =
+        level.unwrap_or_else(|| (format_ident!("INFO"), format_ident!("info")));
 
     let fields = match &input.data {
         Data::Struct(s) => match &s.fields {
@@ -517,6 +485,9 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
 
         #allow_deprecated
         impl #name {
+            /// Stable identity for this event type
+            pub const ID: &'static str = #resolved_id;
+
             /// Severity of this event type (drives the tracing macro below).
             pub const LEVEL: ::tracing_wide::__private::tracing::Level =
                 ::tracing_wide::__private::tracing::Level::#level_const;
@@ -536,6 +507,7 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
             fn as_any(&self) -> &dyn ::core::any::Any { self }
             ::tracing_wide::__message_facet_method! {}
             ::tracing_wide::__message_serialize_method! {}
+            fn id(&self) -> &'static str { Self::ID }
             fn level(&self) -> ::tracing_wide::__private::tracing::Level { Self::LEVEL }
             fn msg(&self) -> &'static str { Self::MSG }
             fn origin(&self) -> &'static ::tracing_wide::Origin { &Self::ORIGIN }
@@ -551,6 +523,7 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
                 deprecated: #msg_deprecation,
                 doc: #msg_doc,
                 fields: &[ #( #fields ),* ],
+                id: #id_raw,
                 level: ::tracing_wide::catalogue::LevelName::#level_const,
                 meta: #msg_meta,
                 msg: #msg,
@@ -593,6 +566,32 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
 /// A struct-level `#[deprecated]` is honored like a field-level one: producers
 /// get rustc's native warning, the note lands in the catalogue descriptor, and
 /// the generated impls are exempted.
+///
+/// # Attributes
+///
+/// Every argument is optional. Anything not named below is kept as a metadata
+/// pair, so `owner = "platform"` needs no registration.
+///
+/// | Attribute | Accepted | Rules | Default |
+/// |---|---|---|---|
+/// | `msg` | string literal | non-empty, no leading or trailing whitespace; `{`/`}` are escaped for tracing | the struct name |
+/// | `id` | string literal | non-empty, no leading or trailing whitespace | `msg` |
+/// | `level` | bare ident or string literal | one of `trace`/`debug`/`info`/`warn`/`error` | `info` |
+/// | `tags` | array of string literals | each non-empty and lowercase; sorted and deduplicated | empty |
+/// | *anything else* | `ident = <literal>` | key an identifier, value str/int/bool/float, each key once | none |
+///
+/// `msg` carries the same two content rules as `id` because it is the fallback
+/// `id`. Beyond them no slug format is imposed on `id`, and no crate prefix on
+/// `tags` — both are external contracts you own, and `Origin` already records
+/// the defining crate.
+///
+/// The struct itself must be a non-generic struct with named fields, no field
+/// may be called `message` (tracing owns that key), and every field type must
+/// implement `Field`.
+///
+/// Each rule above has a compile-fail fixture in `tests/ui/` pinning its exact
+/// diagnostic; `parse_msg`, `parse_id`, `parse_level`, `Tags::parse` and
+/// `MetaPairs::push` are where they are enforced.
 #[proc_macro_attribute]
 pub fn message(attr: TokenStream, item: TokenStream) -> TokenStream {
     expand_message(attr.into(), item.into())
@@ -600,13 +599,101 @@ pub fn message(attr: TokenStream, item: TokenStream) -> TokenStream {
         .into()
 }
 
+/// The two content rules every join-key candidate must satisfy: non-empty, and
+/// no leading or trailing whitespace. `msg` is bound by them because it is the
+/// fallback `id` — validating only `id` would leave the default path able to
+/// produce the empty join key the `id` rules exist to reject.
+fn non_empty_trimmed(lit: &LitStr, key: &str) -> syn::Result<String> {
+    let value = lit.value();
+
+    if value.is_empty() {
+        return Err(Error::new_spanned(
+            lit,
+            format!("`{key}` must not be empty"),
+        ));
+    }
+
+    if value.trim() != value {
+        return Err(Error::new_spanned(
+            lit,
+            format!("`{key}` must not have leading or trailing whitespace"),
+        ));
+    }
+
+    Ok(value)
+}
+
 /// Render an `Option<String>` as `Option<&'static str>` tokens — the shared
-/// shape of the descriptors' `doc` and `deprecated` fields.
+/// shape of the descriptors' `doc`, `deprecated`, and `id` fields.
 fn option_str(value: &Option<String>) -> TokenStream2 {
     match value {
         Some(s) => quote! { ::core::option::Option::Some(#s) },
         None => quote! { ::core::option::Option::None },
     }
+}
+
+// One parser per `#[message]` attribute, each holding every rule for that
+// attribute. `tags` and arbitrary metadata keep theirs in `Tags::parse` and
+// `MetaPairs::push`. Every rule has a `tests/ui` fixture pinning its text.
+
+/// `id = "..."` — the stable join key. A string literal, non-empty, with no
+/// leading or trailing whitespace. A slug format is deliberately *not*
+/// legislated: the id is an external contract the author owns.
+fn parse_id(nv: &MetaNameValue) -> syn::Result<String> {
+    non_empty_trimmed(str_lit(nv, "id")?, "id")
+}
+
+/// `level = warn` or `level = "warn"` — one of trace/debug/info/warn/error.
+/// Returns the `(LevelName const, tracing macro)` ident pair the expansion needs,
+/// so the accepted set is stated once rather than split across parse and codegen.
+fn parse_level(nv: &MetaNameValue) -> syn::Result<(Ident, Ident)> {
+    let name = match &nv.value {
+        Expr::Path(p) if p.path.get_ident().is_some() => p.path.get_ident().unwrap().to_string(),
+        Expr::Lit(ExprLit {
+            lit: Lit::Str(s), ..
+        }) => s.value(),
+        other => {
+            return Err(Error::new_spanned(
+                other,
+                "`level` must be one of trace/debug/info/warn/error",
+            ));
+        }
+    };
+
+    match name.as_str() {
+        "trace" => Ok((format_ident!("TRACE"), format_ident!("trace"))),
+        "debug" => Ok((format_ident!("DEBUG"), format_ident!("debug"))),
+        "info" => Ok((format_ident!("INFO"), format_ident!("info"))),
+        "warn" => Ok((format_ident!("WARN"), format_ident!("warn"))),
+        "error" => Ok((format_ident!("ERROR"), format_ident!("error"))),
+        other => Err(Error::new_spanned(
+            &nv.value,
+            format!("unknown level `{other}` (expected trace/debug/info/warn/error)"),
+        )),
+    }
+}
+
+/// `msg = "..."` — the human-readable event text. A string literal, non-empty and
+/// trimmed like `id`, since it is the fallback `id`. Content is otherwise free
+/// (braces are escaped later for tracing's format-string position).
+fn parse_msg(nv: &MetaNameValue) -> syn::Result<String> {
+    non_empty_trimmed(str_lit(nv, "msg")?, "msg")
+}
+
+/// The string literal behind `key = "..."`, or an error naming `key`. Spanned on
+/// the value, so the caret lands on what the author wrote.
+fn str_lit<'a>(nv: &'a MetaNameValue, key: &str) -> syn::Result<&'a LitStr> {
+    let Expr::Lit(ExprLit {
+        lit: Lit::Str(s), ..
+    }) = &nv.value
+    else {
+        return Err(Error::new_spanned(
+            &nv.value,
+            format!("`{key}` must be a string literal"),
+        ));
+    };
+
+    Ok(s)
 }
 
 #[cfg(test)]
@@ -766,6 +853,39 @@ mod tests {
     fn message_rejects_non_string_msg() {
         let err = expand_message(quote! { msg = 5 }, quote! { struct M { a: usize } }).unwrap_err();
         assert!(err.to_string().contains("must be a string literal"));
+    }
+
+    #[test]
+    fn message_rejects_empty_msg() {
+        let err =
+            expand_message(quote! { msg = "" }, quote! { struct M { a: usize } }).unwrap_err();
+        assert!(err.to_string().contains("must not be empty"));
+    }
+
+    #[test]
+    fn message_rejects_untrimmed_msg() {
+        let err =
+            expand_message(quote! { msg = " x " }, quote! { struct M { a: usize } }).unwrap_err();
+        assert!(err.to_string().contains("whitespace"));
+    }
+
+    #[test]
+    fn message_rejects_non_string_id() {
+        let err = expand_message(quote! { id = 5 }, quote! { struct M { a: usize } }).unwrap_err();
+        assert!(err.to_string().contains("string literal"));
+    }
+
+    #[test]
+    fn message_rejects_empty_id() {
+        let err = expand_message(quote! { id = "" }, quote! { struct M { a: usize } }).unwrap_err();
+        assert!(err.to_string().contains("must not be empty"));
+    }
+
+    #[test]
+    fn message_rejects_untrimmed_id() {
+        let err =
+            expand_message(quote! { id = " x " }, quote! { struct M { a: usize } }).unwrap_err();
+        assert!(err.to_string().contains("whitespace"));
     }
 
     #[test]

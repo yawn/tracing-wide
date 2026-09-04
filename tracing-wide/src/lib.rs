@@ -93,6 +93,11 @@ pub trait Message: __private::MessageBehaviour {
         None
     }
 
+    /// Stable identity of this event.
+    ///
+    /// This is either set explicitly or derived from the `msg` itself.
+    fn id(&self) -> &'static str;
+
     /// Severity of this event type; `#[message(level = ...)]`, default `INFO`.
     fn level(&self) -> tracing::Level;
 

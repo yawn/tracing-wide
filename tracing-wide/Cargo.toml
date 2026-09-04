@@ -1,4 +1,7 @@
 [package]
+# `tests/common.rs` holds shared fixtures, not tests — auto-discovery would
+# build it as a test target of its own, so every target below is listed.
+autotests = false
 description = "Wide structured events for tokio `tracing`: define a struct per event and emit all observability-relevant fields at one site."
 name = "tracing-wide"
 readme = "README.md"
@@ -120,6 +123,33 @@ required-features = ["subscriber", "serde"]
 [[example]]
 name = "tags"
 required-features = ["subscriber"]
+
+[[test]]
+name = "catalogue"
+
+[[test]]
+name = "core"
+
+[[test]]
+name = "cross_crate"
+
+[[test]]
+name = "examples"
+
+[[test]]
+name = "facet"
+
+[[test]]
+name = "instrument"
+
+[[test]]
+name = "serde"
+
+[[test]]
+name = "subscriber"
+
+[[test]]
+name = "ui"
 
 [package.metadata.docs.rs]
 features = ["catalogue", "docs", "facet", "instrument", "serde", "std", "subscriber" ]

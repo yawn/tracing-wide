@@ -12,6 +12,13 @@ use tracing_wide::message;
 /// Collects event fields as `(name, rendered value)` pairs.
 pub struct KvGrab(pub Vec<(String, String)>);
 
+/// Explicit id that is deliberately not its `msg`.
+#[message(msg = "payment charged", id = "billing.payment_charged")]
+#[derive(Default)]
+pub struct Charged {
+    pub cents: usize,
+}
+
 /// No explicit `msg`: the catalogue entry is keyed by the struct name.
 #[message]
 #[derive(Default)]

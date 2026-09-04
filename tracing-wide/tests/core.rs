@@ -11,7 +11,7 @@ mod common;
 
 use std::sync::{Arc, Mutex};
 
-use common::{KvGrab, Renamed, Started};
+use common::{Charged, KvGrab, Renamed, Started};
 use seq_macro::seq;
 use tracing::Level;
 use tracing_wide::{Message, event, message};
@@ -153,7 +153,7 @@ fn consts_reflect_message_attributes() {
     assert_eq!(Started::LEVEL, Level::WARN);
     assert_eq!(Started::TAGS.to_vec(), ["platform", "startup"]);
     assert_eq!(Started::ORIGIN.krate, "tracing-wide");
-    assert!(Started::ORIGIN.file.ends_with("common/mod.rs"));
+    assert!(Started::ORIGIN.file.ends_with("common.rs"));
 
     assert_eq!(Renamed::MSG, "Renamed");
     assert_eq!(Plain::LEVEL, Level::INFO);
@@ -171,6 +171,7 @@ fn dyn_message_exposes_accessors_and_downcast() {
     let dynamic: &dyn Message = &started;
 
     assert_eq!(dynamic.msg(), "service started");
+    assert_eq!(dynamic.id(), "service started");
     assert_eq!(dynamic.level(), Level::WARN);
     assert_eq!(dynamic.tags().to_vec(), ["platform", "startup"]);
     assert_eq!(dynamic.origin().krate, "tracing-wide");
@@ -182,6 +183,12 @@ fn dyn_message_exposes_accessors_and_downcast() {
 
     assert_eq!(back.service, "billing");
     assert_eq!(back.attempt, 3);
+
+    // The routing case: a sink reads the stable id off `&dyn Message`, with no
+    // catalogue join and no knowledge of the concrete type.
+    let charged: &dyn Message = &Charged { cents: 500 };
+
+    assert_eq!(charged.id(), "billing.payment_charged");
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), test)]
@@ -319,4 +326,14 @@ fn emit_records_typed_field_values() {
     assert!(fields.contains(&("service".to_string(), "billing".to_string())));
     assert!(fields.contains(&("attempt".to_string(), "3".to_string())));
     assert!(fields.contains(&("message".to_string(), "service started".to_string())));
+}
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn id_const_resolves_the_explicit_msg_type_name_chain() {
+    assert_eq!(Charged::ID, "billing.payment_charged");
+    assert_eq!(Charged::MSG, "payment charged");
+
+    assert_eq!(Started::ID, "service started");
+    assert_eq!(Renamed::ID, "Renamed");
 }

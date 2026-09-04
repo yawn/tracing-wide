@@ -2,7 +2,7 @@
 //! and read back at runtime. Gated as a whole by the `catalogue` feature.
 
 use core::any::TypeId;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use tracing::Level;
 
@@ -73,6 +73,14 @@ pub struct MessageDescriptor {
     #[cfg_attr(feature = "facet", facet(skip_serializing_if = Option::is_none))]
     pub doc: Option<&'static str>,
     pub fields: &'static [FieldDescriptor],
+    /// The *raw* explicit id: `Some` if the type carried `#[message(id = "...")]`.
+    /// Not serialized: the entry is keyed by [`resolved_id`](Self::resolved_id), and
+    /// re-stating the raw id inside it would duplicate that key for every message
+    /// that declares one. A consumer that needs "was this id explicit?" reads the
+    /// live descriptor, not the manifest.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "facet", facet(skip))]
+    pub id: Option<&'static str>,
     /// Severity, recorded as its canonical name — see [`LevelName`].
     pub level: LevelName,
     /// Arbitrary k/v from `#[message(key = ...)]` (everything but `msg`/`level`),
@@ -83,9 +91,12 @@ pub struct MessageDescriptor {
     )]
     #[cfg_attr(feature = "facet", facet(proxy = MetaMap, skip_serializing_if = pairs_empty))]
     pub meta: &'static [(&'static str, &'static str)],
-    /// The unique join key. Excluded from serialization: a serialized catalogue
-    /// keys its entries by `msg` (see the `catalogue-serde` example), so rendering it
-    /// inside the entry too would duplicate the key.
+    /// The human-readable event text — semantically the unique name of this event
+    /// type, though uniqueness is enforced on
+    /// [`resolved_id`](Self::resolved_id), not here. Excluded from serialization:
+    /// the manifest keys its entries by the resolved id (see the
+    /// `catalogue-serde` example), which equals `msg` unless an explicit id
+    /// overrides it.
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "facet", facet(skip))]
     pub msg: &'static str,
@@ -105,6 +116,15 @@ pub struct MessageDescriptor {
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "facet", facet(skip))]
     pub type_id: TypeId,
+}
+
+impl MessageDescriptor {
+    /// The resolved join key: the explicit [`id`](Self::id) if present, else
+    /// [`msg`](Self::msg). This is the value [`Message::id`](crate::Message::id)
+    /// returns for a live instance and the value [`duplicates`] walks.
+    pub fn resolved_id(&self) -> &'static str {
+        self.id.unwrap_or(self.msg)
+    }
 }
 
 impl LevelName {
@@ -209,32 +229,47 @@ pub fn all() -> impl Iterator<Item = &'static MessageDescriptor> {
     inventory::iter::<MessageDescriptor>.into_iter()
 }
 
-/// The `msg` values registered by more than one message type — `msg` is the
-/// catalogue's unique join key, so an empty result is the invariant. A proc
-/// macro cannot enforce this (each expansion is blind to its siblings), so the
-/// check is a runtime walk; its natural home is a test in the *application*
+/// Every resolved [`id`](MessageDescriptor::resolved_id) claimed by more than
+/// one message type, mapped to the descriptors that claim it. The resolved id is
+/// the catalogue's unique join key, so an empty map is the invariant (an explicit
+/// id colliding with another message's fallback text counts as a duplicate). A
+/// proc macro cannot enforce this (each expansion is blind to its siblings), so
+/// the check is a runtime walk; its natural home is a test in the *application*
 /// crate, where every linked-in message is registered:
 ///
 /// ```ignore
 /// #[test]
-/// fn catalogue_msgs_are_unique() {
-///     assert_eq!(tracing_wide::catalogue::duplicates(), Vec::<&str>::new());
+/// fn catalogue_ids_are_unique() {
+///     let dupes = tracing_wide::catalogue::duplicates();
+///     assert!(dupes.is_empty(), "{dupes:#?}");
 /// }
 /// ```
-pub fn duplicates() -> Vec<&'static str> {
-    let mut counts = HashMap::new();
+///
+/// The descriptors carry [`origin`](MessageDescriptor::origin), so that failure
+/// names the crate, file and line of each colliding definition — the detail a
+/// bare id cannot give when the collision spans two crates. Both the map and each
+/// entry's descriptors are ordered (by id, then by definition site), so the report
+/// is stable across runs.
+pub fn duplicates() -> BTreeMap<&'static str, Vec<&'static MessageDescriptor>> {
+    let mut by_id: BTreeMap<&'static str, Vec<&'static MessageDescriptor>> = BTreeMap::new();
     for descriptor in all() {
-        *counts.entry(descriptor.msg).or_insert(0_usize) += 1;
+        by_id
+            .entry(descriptor.resolved_id())
+            .or_default()
+            .push(descriptor);
     }
 
-    let mut keys: Vec<&'static str> = counts
-        .into_iter()
-        .filter_map(|(msg, count)| (count > 1).then_some(msg))
-        .collect();
+    by_id.retain(|_, descriptors| descriptors.len() > 1);
 
-    keys.sort_unstable();
+    // Link order is not stable across builds; the definition site is. Two messages
+    // expanded from one `macro_rules!` share a call-site span, so `msg` breaks the
+    // remaining ties.
+    for descriptors in by_id.values_mut() {
+        descriptors
+            .sort_unstable_by_key(|d| (d.origin.file, d.origin.line, d.origin.column, d.msg));
+    }
 
-    keys
+    by_id
 }
 
 inventory::collect!(MessageDescriptor);

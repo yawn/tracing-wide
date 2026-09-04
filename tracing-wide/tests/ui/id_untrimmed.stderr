@@ -1,0 +1,5 @@
+error: `id` must not have leading or trailing whitespace
+ --> tests/ui/id_untrimmed.rs:3:41
+  |
+3 | #[tracing_wide::message(msg = "x", id = " checkout.started ")]
+  |                                         ^^^^^^^^^^^^^^^^^^^^

@@ -1,0 +1,5 @@
+error: a tag must not be empty
+ --> tests/ui/tag_empty.rs:2:44
+  |
+2 | #[tracing_wide::message(msg = "x", tags = [""])]
+  |                                            ^^

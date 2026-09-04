@@ -1,0 +1,5 @@
+error: `level` must be one of trace/debug/info/warn/error
+ --> tests/ui/level_not_ident.rs:2:44
+  |
+2 | #[tracing_wide::message(msg = "x", level = 5)]
+  |                                            ^

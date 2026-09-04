@@ -22,7 +22,7 @@ Highlights include:
 - Catalogue: every message a binary can emit, auto-registered and walkable,
   including messages defined in libraries or member crates as long as they're
   linked in. The catalogue is representation-agnostic - it's plain data you can
-  serialize to any format (or none): a manifest (`msg` is the unique join key)
+  serialize to any format (or none): a manifest (the resolved `id` is the unique join key)
   that non-technical stakeholders can reason about, with duplicate keys detectable
   in a test.
 - Automatic origin: crate / module / file / line / column captured per
