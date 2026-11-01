@@ -8,8 +8,9 @@ use core::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 use common::Collector;
-use tracing::Level;
+use tracing::{Level, subscriber};
 use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::registry;
 use tracing_wide::sink::{Sink, Sinks};
 use tracing_wide::{Message, event, message};
 
@@ -179,10 +180,14 @@ fn dispatch_precedes_the_tracing_handoff() {
     )));
 
     sinks.with_default(|| {
-        let subscriber =
-            tracing_subscriber::registry().with(Collector(order.clone(), |_| "record"));
+        let collector = Collector {
+            log: order.clone(),
+            map: |_| "record",
+        };
 
-        tracing::subscriber::with_default(subscriber, || event!(OrderedEvent::default()));
+        subscriber::with_default(registry().with(collector), || {
+            event!(OrderedEvent::default())
+        });
     });
 
     assert_eq!(*order.lock().unwrap(), vec!["dispatch", "record"]);

@@ -40,7 +40,10 @@ fn collect(f: impl FnOnce()) -> Vec<Vec<(String, String)>> {
     let events = Arc::new(Mutex::new(Vec::new()));
     let subscriber = tracing_subscriber::registry()
         .with(tracing_wide::instrument::layer())
-        .with(Collector(events.clone(), KvGrab::fields));
+        .with(Collector {
+            log: events.clone(),
+            map: KvGrab::fields,
+        });
 
     tracing::subscriber::with_default(subscriber, f);
 
