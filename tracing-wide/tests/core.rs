@@ -277,7 +277,7 @@ fn emit_records_every_field_of_a_message_wider_than_the_documented_limit() {
     let collect = |emit: &dyn Fn()| {
         let events = Arc::new(Mutex::new(Vec::new()));
         tracing::subscriber::with_default(FieldCollector(events.clone()), emit);
-        Arc::try_unwrap(events).unwrap().into_inner().unwrap()
+        events.lock().unwrap().clone()
     };
 
     assert_round_trip(
