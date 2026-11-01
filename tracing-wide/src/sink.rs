@@ -18,6 +18,8 @@ thread_local! {
 pub struct DefaultGuard(Option<Arc<Sinks>>);
 
 /// A sink for each emitted message; downcast with [`Message::as_any`].
+///
+/// A panic in `on_message` propagates to the caller of `event!`; keep it panic-free.
 pub trait Sink: Send + Sync {
     fn on_message(&self, msg: &dyn Message);
 }
