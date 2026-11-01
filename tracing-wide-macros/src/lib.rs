@@ -648,8 +648,9 @@ mod tests {
         format!("{prefix}{digits}{suffix}")
     }
 
+    /// The full expansion of a small message, verbatim.
     #[test]
-    fn message_expansion_pretty_prints() {
+    fn message_expands_verbatim() {
         let attr = quote! { msg = "hi", level = warn, owner = "x" };
         let item = quote! {
             /// A demo event.
@@ -659,11 +660,91 @@ mod tests {
                 b: usize,
             }
         };
-        let pretty = expand_parse_unparse(attr, item);
 
-        assert!(pretty.contains("impl ::tracing_wide::Message for Demo"));
-        assert!(pretty.contains("pub const MSG"));
-        println!("{pretty}");
+        assert_eq!(
+            expand_parse_unparse(attr, item),
+            r##"/// A demo event.
+struct Demo {
+    a: usize,
+    b: usize,
+}
+impl Demo {
+    /// Stable identity of this event type.
+    pub const ID: &'static str = "hi";
+    /// Severity of this event type.
+    pub const LEVEL: ::tracing_wide::__private::tracing::Level = ::tracing_wide::__private::tracing::Level::WARN;
+    /// Metadata of this event type.
+    pub const META: ::tracing_wide::Meta = ::tracing_wide::Meta::__new(
+        &[("owner", "x")],
+    );
+    /// Constant, static message text for this event type.
+    pub const MSG: &'static str = "hi";
+    /// Where this event type is defined: automatic provenance.
+    pub const ORIGIN: ::tracing_wide::Origin = ::tracing_wide::Origin {
+        column: ::core::column!(),
+        file: ::core::file!(),
+        krate: ::core::env!("CARGO_PKG_NAME"),
+        line: ::core::line!(),
+        module: ::core::module_path!(),
+    };
+    /// Routing tags of this event type.
+    pub const TAGS: ::tracing_wide::Tags = ::tracing_wide::Tags::__new(&[]);
+}
+impl ::tracing_wide::Message for Demo {
+    fn as_any(&self) -> &dyn ::core::any::Any {
+        self
+    }
+    ::tracing_wide::__message_facet_method! {}
+    ::tracing_wide::__message_serialize_method! {}
+    fn id(&self) -> &'static str {
+        Self::ID
+    }
+    fn level(&self) -> ::tracing_wide::__private::tracing::Level {
+        Self::LEVEL
+    }
+    fn meta(&self) -> ::tracing_wide::Meta {
+        Self::META
+    }
+    fn msg(&self) -> &'static str {
+        Self::MSG
+    }
+    fn origin(&self) -> &'static ::tracing_wide::Origin {
+        &Self::ORIGIN
+    }
+    fn tags(&self) -> ::tracing_wide::Tags {
+        Self::TAGS
+    }
+}
+#[doc(hidden)]
+impl ::tracing_wide::__private::Sealed for Demo {}
+::tracing_wide::__register_message! {
+    ::tracing_wide::catalogue::MessageDescriptor { deprecated :
+    ::core::option::Option::None, doc : ::core::option::Option::Some("A demo event."),
+    fields : & [::tracing_wide::catalogue::FieldDescriptor { deprecated :
+    ::core::option::Option::None, doc : ::core::option::Option::None, meta :
+    ::tracing_wide::Meta::__new(& []), name : ::core::stringify!(a), r#type :
+    ::core::stringify!(usize), }, ::tracing_wide::catalogue::FieldDescriptor { deprecated
+    : ::core::option::Option::None, doc : ::core::option::Option::None, meta :
+    ::tracing_wide::Meta::__new(& [("unit", "ms")]), name : ::core::stringify!(b), r#type
+    : ::core::stringify!(usize), }], id : ::core::option::Option::None, level :
+    ::tracing_wide::catalogue::LevelName::WARN, meta : Demo::META, msg : "hi", origin :
+    Demo::ORIGIN, tags : Demo::TAGS, type_id : ::core::any::TypeId::of:: < Demo > (), }
+}
+#[doc(hidden)]
+impl ::tracing_wide::__private::MessageBehaviour for Demo {
+    ::tracing_wide::__message_ambient_method! {}
+    #[allow(deprecated)]
+    fn record(&self) {
+        ::tracing_wide::__private::tracing::warn!(a = & self.a, b = & self.b, "hi");
+    }
+}
+const _: fn() = || {
+    fn __tracing_wide_assert_field<T: ::tracing_wide::Field>() {}
+    __tracing_wide_assert_field::<usize>();
+    __tracing_wide_assert_field::<usize>();
+};
+"##
+        );
     }
 
     #[test]
@@ -747,14 +828,6 @@ mod tests {
             ),
             "{bare}"
         );
-    }
-
-    #[test]
-    fn message_emits_origin_const() {
-        let pretty = expand_parse_unparse(quote! { msg = "m" }, quote! { struct M { x: usize } });
-        assert!(pretty.contains("pub const ORIGIN"));
-        assert!(pretty.contains("CARGO_PKG_NAME"));
-        assert!(pretty.contains("pub const TAGS"));
     }
 
     proptest! {
