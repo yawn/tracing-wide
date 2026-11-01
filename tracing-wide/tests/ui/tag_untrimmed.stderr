@@ -1,0 +1,5 @@
+error: `tag` must not have leading or trailing whitespace
+ --> tests/ui/tag_untrimmed.rs:2:44
+  |
+2 | #[tracing_wide::message(msg = "x", tags = [" security "])]
+  |                                            ^^^^^^^^^^^^

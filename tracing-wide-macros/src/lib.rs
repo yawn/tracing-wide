@@ -206,7 +206,7 @@ impl MetaAttr {
 }
 
 impl TagsAttr {
-    /// Parses `["a", "b"]`: non-empty, lowercase string literals.
+    /// Parses `["a", "b"]`: non-empty, trimmed, lowercase string literals.
     fn parse(value: &Expr) -> syn::Result<Self> {
         let Expr::Array(array) = value else {
             return Err(Error::new_spanned(
@@ -228,11 +228,7 @@ impl TagsAttr {
                 ));
             };
 
-            let tag = s.value();
-
-            if tag.is_empty() {
-                return Err(Error::new_spanned(s, "a tag must not be empty"));
-            }
+            let tag = non_empty_trimmed(s, "tag")?;
 
             if tag != tag.to_lowercase() {
                 return Err(Error::new_spanned(
@@ -524,7 +520,7 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
 /// | `msg` | string literal | non-empty, no leading or trailing whitespace | the struct name |
 /// | `id` | string literal | non-empty, no leading or trailing whitespace | `msg` |
 /// | `level` | bare ident or string literal | one of `trace`/`debug`/`info`/`warn`/`error` | `info` |
-/// | `tags` | array of string literals | each non-empty and lowercase; sorted and deduplicated | empty |
+/// | `tags` | array of string literals | each non-empty, trimmed, and lowercase; sorted and deduplicated | empty |
 /// | *anything else* | `ident = <literal>` | key an identifier, value str/int/bool/float; keys unique, sorted | none |
 ///
 /// The struct must be non-generic with named fields, and no field may be called `message`.
@@ -881,6 +877,13 @@ mod tests {
         let err =
             expand_message(quote! { tags = [""] }, quote! { struct M { a: usize } }).unwrap_err();
         assert!(err.to_string().contains("must not be empty"));
+    }
+
+    #[test]
+    fn message_rejects_untrimmed_tag() {
+        let err = expand_message(quote! { tags = [" a "] }, quote! { struct M { a: usize } })
+            .unwrap_err();
+        assert!(err.to_string().contains("whitespace"));
     }
 
     #[test]

@@ -52,6 +52,8 @@ Pre-1.0, a breaking change bumps the minor version.
   application. Applications legitimately enable it for catalogue tests
   (`catalogue::duplicates()`), lookups, and manifest generation; libraries still
   should not.
+- **Breaking:** a tag must be free of leading or trailing whitespace, the same
+  rule as `msg` and `id`.
 - **Breaking:** `msg` must be non-empty and free of leading or trailing
   whitespace, the same two rules as `id`. `msg` is the fallback `id`, so the
   default path could otherwise produce the empty join key `id` rejects.
