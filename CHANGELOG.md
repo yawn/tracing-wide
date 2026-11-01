@@ -8,6 +8,11 @@ Pre-1.0, a breaking change bumps the minor version.
 
 ## [Unreleased]
 
+### Added
+
+- Example `metrics`, deriving OpenTelemetry metrics from messages in a sink and
+  printing them with the stdout exporter.
+
 ### Changed
 
 - **Breaking:** renamed the fan-out trait `subscriber::Subscriber` to `sink::Sink` and

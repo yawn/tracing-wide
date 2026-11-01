@@ -16,7 +16,7 @@ docs:
     rm -rf target/doc
     RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps
 
-examples: example-catalogue-facet example-catalogue-serde example-instrument example-sink example-sink-facet example-sink-serde example-tags
+examples: example-catalogue-facet example-catalogue-serde example-instrument example-metrics example-sink example-sink-facet example-sink-serde example-tags
 
 example-catalogue-facet:
     cargo run --example catalogue-facet --features catalogue,facet
@@ -26,6 +26,9 @@ example-catalogue-serde:
 
 example-instrument:
     cargo run --example instrument --features instrument,sink
+
+example-metrics:
+    cargo run --example metrics --features sink
 
 example-sink:
     cargo run --example sink --features sink

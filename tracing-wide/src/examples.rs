@@ -27,6 +27,15 @@
 #![doc = include_str!("../examples/output/instrument.md")]
 
 //!
+//! ## `metrics`
+//!
+#![doc = "```rust,ignore"]
+#![doc = include_str!("../examples/metrics.rs")]
+#![doc = "```"]
+#![doc = ""]
+#![doc = include_str!("../examples/output/metrics.md")]
+
+//!
 //! ## `sink-serde`
 //!
 #![doc = "```rust,ignore"]
