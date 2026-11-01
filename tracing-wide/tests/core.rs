@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use common::{Charged, KvGrab, Renamed, Started};
 use seq_macro::seq;
 use tracing::Level;
-use tracing_wide::{Message, event, message};
+use tracing_wide::{Message, Meta, event, message};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -149,14 +149,16 @@ impl tracing::field::Visit for MessageGrab {
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn consts_reflect_message_attributes() {
-    assert_eq!(Started::MSG, "service started");
-    assert_eq!(Started::LEVEL, Level::WARN);
-    assert_eq!(Started::TAGS.to_vec(), ["platform", "startup"]);
-    assert_eq!(Started::ORIGIN.krate, "tracing-wide");
     assert!(Started::ORIGIN.file.ends_with("common.rs"));
+    assert_eq!(Started::LEVEL, Level::WARN);
+    assert_eq!(Started::META.get("owner"), Some("platform"));
+    assert_eq!(Started::MSG, "service started");
+    assert_eq!(Started::ORIGIN.krate, "tracing-wide");
+    assert_eq!(Started::TAGS.to_vec(), ["platform", "startup"]);
 
-    assert_eq!(Renamed::MSG, "Renamed");
+    assert!(Plain::META.is_empty());
     assert_eq!(Plain::LEVEL, Level::INFO);
+    assert_eq!(Renamed::MSG, "Renamed");
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), test)]
@@ -170,11 +172,12 @@ fn dyn_message_exposes_accessors_and_downcast() {
 
     let dynamic: &dyn Message = &started;
 
-    assert_eq!(dynamic.msg(), "service started");
     assert_eq!(dynamic.id(), "service started");
     assert_eq!(dynamic.level(), Level::WARN);
-    assert_eq!(dynamic.tags().to_vec(), ["platform", "startup"]);
+    assert_eq!(dynamic.meta().get("owner"), Some("platform"));
+    assert_eq!(dynamic.msg(), "service started");
     assert_eq!(dynamic.origin().krate, "tracing-wide");
+    assert_eq!(dynamic.tags().to_vec(), ["platform", "startup"]);
 
     let back = dynamic
         .as_any()
@@ -334,4 +337,29 @@ fn id_const_resolves_the_explicit_msg_type_name_chain() {
 
     assert_eq!(Started::ID, "service started");
     assert_eq!(Renamed::ID, "Renamed");
+}
+
+/// `Meta` finds a value by key, lists its pairs, and reports when it has none.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn meta_looks_up_and_lists_its_pairs() {
+    let meta = Meta::__new(&[("owner", "platform"), ("tier", "2")]);
+
+    assert!(!meta.is_empty());
+    assert!(Meta::default().is_empty());
+    assert_eq!(meta.get("team"), None);
+    assert_eq!(meta.get("tier"), Some("2"));
+    assert_eq!(
+        meta.iter().collect::<Vec<_>>(),
+        [("owner", "platform"), ("tier", "2")]
+    );
+}
+
+/// A message that declares no metadata returns an empty `Meta` through `&dyn Message`.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn meta_of_a_message_without_pairs_is_empty() {
+    let plain: &dyn Message = &Plain::default();
+
+    assert!(plain.meta().is_empty());
 }

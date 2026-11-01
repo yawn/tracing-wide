@@ -1,5 +1,7 @@
 //! Proc macros for tracing-wide: `#[message]` and `event!`. Use them through `tracing-wide`.
 
+use std::collections::{BTreeMap, btree_map::Entry};
+
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{ToTokens, format_ident, quote, quote_spanned};
@@ -19,17 +21,17 @@ struct MessageField {
     deprecated: Deprecation,
     doc: Docs,
     ident: Ident,
-    meta: MetaPairs,
+    meta: MetaAttr,
     ty: Type,
 }
 
-/// The `key = <literal>` metadata pairs; renders as `&[(&str, &str)]`.
+/// The `key = <literal>` metadata pairs, sorted by key; renders as `Meta`.
 #[derive(Default)]
-struct MetaPairs(Vec<(String, String)>);
+struct MetaAttr(BTreeMap<String, String>);
 
 /// The `tags = [...]` labels: sorted, deduped, lowercase; renders as `&[&str]`.
 #[derive(Default)]
-struct Tags(Vec<String>);
+struct TagsAttr(Vec<String>);
 
 impl Deprecation {
     /// The reason of the first `#[deprecated]`, in its bare, `= "…"`, or `(note = "…")` form.
@@ -136,7 +138,7 @@ impl MessageField {
             ));
         }
 
-        let mut meta = MetaPairs::default();
+        let mut meta = MetaAttr::default();
 
         for a in &field.attrs {
             if a.path().is_ident("field") {
@@ -159,7 +161,7 @@ impl MessageField {
     }
 }
 
-impl MetaPairs {
+impl MetaAttr {
     /// Adds one `key = <literal>` pair, with the value as a string.
     fn push(&mut self, kv: &MetaNameValue) -> syn::Result<()> {
         let Some(key) = kv.path.get_ident() else {
@@ -169,12 +171,12 @@ impl MetaPairs {
             ));
         };
 
-        if self.0.iter().any(|(k, _)| key == k) {
+        let Entry::Vacant(slot) = self.0.entry(key.to_string()) else {
             return Err(Error::new_spanned(
                 key,
                 format!("duplicate metadata key `{key}`"),
             ));
-        }
+        };
 
         let value = match &kv.value {
             Expr::Lit(ExprLit {
@@ -197,13 +199,13 @@ impl MetaPairs {
             }
         };
 
-        self.0.push((key.to_string(), value));
+        slot.insert(value);
 
         Ok(())
     }
 }
 
-impl Tags {
+impl TagsAttr {
     /// Parses `["a", "b"]`: non-empty, lowercase string literals.
     fn parse(value: &Expr) -> syn::Result<Self> {
         let Expr::Array(array) = value else {
@@ -245,7 +247,7 @@ impl Tags {
         tags.sort_unstable();
         tags.dedup();
 
-        Ok(Tags(tags))
+        Ok(TagsAttr(tags))
     }
 }
 
@@ -283,15 +285,15 @@ impl ToTokens for MessageField {
     }
 }
 
-impl ToTokens for MetaPairs {
+impl ToTokens for MetaAttr {
     fn to_tokens(&self, tokens: &mut TokenStream2) {
-        let keys = self.0.iter().map(|(k, _)| k);
-        let vals = self.0.iter().map(|(_, v)| v);
-        tokens.extend(quote! { &[ #( (#keys, #vals) ),* ] });
+        let keys = self.0.keys();
+        let vals = self.0.values();
+        tokens.extend(quote! { ::tracing_wide::Meta::__new(&[ #( (#keys, #vals) ),* ]) });
     }
 }
 
-impl ToTokens for Tags {
+impl ToTokens for TagsAttr {
     fn to_tokens(&self, tokens: &mut TokenStream2) {
         let tags = self.0.iter();
 
@@ -332,8 +334,8 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
     let mut msg: Option<String> = None;
     let mut id: Option<String> = None;
     let mut level: Option<(Ident, Ident)> = None;
-    let mut tags = Tags::default();
-    let mut msg_meta = MetaPairs::default();
+    let mut tags = TagsAttr::default();
+    let mut msg_meta = MetaAttr::default();
 
     let metas = Punctuated::<Meta, Token![,]>::parse_terminated.parse2(attr)?;
 
@@ -349,7 +351,7 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
             Meta::NameValue(nv) if nv.path.is_ident("msg") => msg = Some(parse_msg(&nv)?),
             Meta::NameValue(nv) if nv.path.is_ident("id") => id = Some(parse_id(&nv)?),
             Meta::NameValue(nv) if nv.path.is_ident("level") => level = Some(parse_level(&nv)?),
-            Meta::NameValue(nv) if nv.path.is_ident("tags") => tags = Tags::parse(&nv.value)?,
+            Meta::NameValue(nv) if nv.path.is_ident("tags") => tags = TagsAttr::parse(&nv.value)?,
             Meta::NameValue(nv) => msg_meta.push(&nv)?,
             Meta::List(l) => {
                 return Err(Error::new_spanned(
@@ -445,6 +447,9 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
             pub const LEVEL: ::tracing_wide::__private::tracing::Level =
                 ::tracing_wide::__private::tracing::Level::#level_const;
 
+            /// Metadata pairs for this event type, sorted by key.
+            pub const META: ::tracing_wide::Meta = #msg_meta;
+
             /// Constant, static message text for this event type.
             pub const MSG: &'static str = #msg;
 
@@ -462,6 +467,7 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
             ::tracing_wide::__message_serialize_method! {}
             fn id(&self) -> &'static str { Self::ID }
             fn level(&self) -> ::tracing_wide::__private::tracing::Level { Self::LEVEL }
+            fn meta(&self) -> ::tracing_wide::Meta { Self::META }
             fn msg(&self) -> &'static str { Self::MSG }
             fn origin(&self) -> &'static ::tracing_wide::Origin { &Self::ORIGIN }
             fn tags(&self) -> &'static [&'static str] { Self::TAGS }
@@ -478,7 +484,7 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
                 fields: &[ #( #fields ),* ],
                 id: #id_raw,
                 level: ::tracing_wide::catalogue::LevelName::#level_const,
-                meta: #msg_meta,
+                meta: #name::META,
                 msg: #msg,
                 origin: #name::ORIGIN,
                 tags: #name::TAGS,
@@ -509,9 +515,9 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
 
 /// Marks a struct as a `Message`: `#[message(msg = "...", level = warn, tags = ["a"], key = "value")]`.
 ///
-/// `msg` defaults to the struct name, `id` to `msg`, `level` to `info`. Any other `key = <literal>` is catalogue
-/// metadata, as is `#[field(key = <literal>)]` on a field. Each field type must be a `Field`. A `#[deprecated]` warns
-/// producers and goes into the catalogue.
+/// `msg` defaults to the struct name, `id` to `msg`, `level` to `info`. Any other `key = <literal>` is metadata, read
+/// with `Message::meta()` and in the catalogue; `#[field(key = <literal>)]` adds field metadata to the catalogue. Each
+/// field type must be a `Field`. A `#[deprecated]` warns producers and goes into the catalogue.
 ///
 /// | Attribute | Accepted | Rules | Default |
 /// |---|---|---|---|
@@ -519,7 +525,7 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
 /// | `id` | string literal | non-empty, no leading or trailing whitespace | `msg` |
 /// | `level` | bare ident or string literal | one of `trace`/`debug`/`info`/`warn`/`error` | `info` |
 /// | `tags` | array of string literals | each non-empty and lowercase; sorted and deduplicated | empty |
-/// | *anything else* | `ident = <literal>` | key an identifier, value str/int/bool/float, each key once | none |
+/// | *anything else* | `ident = <literal>` | key an identifier, value str/int/bool/float; keys unique, sorted | none |
 ///
 /// The struct must be non-generic with named fields, and no field may be called `message`.
 #[proc_macro_attribute]
@@ -616,6 +622,13 @@ mod tests {
     use super::*;
     use quote::quote;
 
+    /// Expands `#[message(attr)]` on `item`, parses the output as a file, and pretty-prints it.
+    fn expand_parse_unparse(attr: TokenStream2, item: TokenStream2) -> String {
+        let expanded = expand_message(attr, item).expect("expansion succeeds");
+
+        prettyplease::unparse(&syn::parse2::<syn::File>(expanded).expect("output is valid Rust"))
+    }
+
     #[test]
     fn message_expansion_pretty_prints() {
         let attr = quote! { msg = "hi", level = warn, owner = "x" };
@@ -627,9 +640,7 @@ mod tests {
                 b: usize,
             }
         };
-        let expanded = expand_message(attr, item).expect("expansion succeeds");
-        let file = syn::parse2::<syn::File>(expanded).expect("output is valid Rust");
-        let pretty = prettyplease::unparse(&file);
+        let pretty = expand_parse_unparse(attr, item);
 
         assert!(pretty.contains("impl ::tracing_wide::Message for Demo"));
         assert!(pretty.contains("pub const MSG"));
@@ -638,10 +649,7 @@ mod tests {
 
     #[test]
     fn message_harvests_deprecation() {
-        let pretty = |item: TokenStream2| {
-            let expanded = expand_message(quote! { msg = "m" }, item).expect("expansion succeeds");
-            prettyplease::unparse(&syn::parse2::<syn::File>(expanded).unwrap())
-        };
+        let pretty = |item| expand_parse_unparse(quote! { msg = "m" }, item);
 
         let noted = pretty(quote! { #[deprecated = "use `n`"] struct M { a: usize } });
         assert!(noted.contains(r#"Some("use `n`")"#), "{noted}");
@@ -743,12 +751,10 @@ mod tests {
 
     #[test]
     fn message_escapes_braces_in_recorded_msg() {
-        let expanded = expand_message(
+        let pretty = expand_parse_unparse(
             quote! { msg = "rate {limit} hit" },
             quote! { struct M { a: usize } },
-        )
-        .expect("expansion succeeds");
-        let pretty = prettyplease::unparse(&syn::parse2::<syn::File>(expanded).unwrap());
+        );
 
         // The const keeps the text verbatim; only the tracing handoff sees the escaped form.
         assert!(pretty.contains(r#""rate {limit} hit""#), "{pretty}");
@@ -810,13 +816,10 @@ mod tests {
 
     #[test]
     fn message_sorts_and_dedups_tags() {
-        let expanded = expand_message(
+        let pretty = expand_parse_unparse(
             quote! { msg = "m", tags = ["b", "a", "a"] },
             quote! { struct M { x: usize } },
-        )
-        .expect("expansion succeeds");
-        let file = syn::parse2::<syn::File>(expanded).expect("output is valid Rust");
-        let pretty = prettyplease::unparse(&file);
+        );
         assert!(pretty.contains("pub const TAGS"));
         assert!(
             pretty.contains(r#"["a", "b"]"#),
@@ -825,10 +828,31 @@ mod tests {
     }
 
     #[test]
+    fn message_emits_meta_const() {
+        let pretty = |attr| expand_parse_unparse(attr, quote! { struct M { a: usize } });
+
+        let pairs = pretty(quote! { msg = "m", tier = 2, owner = "platform" });
+        assert!(
+            pairs.contains(concat!(
+                "    pub const META: ::tracing_wide::Meta = ::tracing_wide::Meta::__new(\n",
+                "        &[(\"owner\", \"platform\"), (\"tier\", \"2\")],\n",
+                "    );\n",
+            )),
+            "{pairs}"
+        );
+
+        let bare = pretty(quote! { msg = "m" });
+        assert!(
+            bare.contains(
+                "    pub const META: ::tracing_wide::Meta = ::tracing_wide::Meta::__new(&[]);\n"
+            ),
+            "{bare}"
+        );
+    }
+
+    #[test]
     fn message_emits_origin_const() {
-        let expanded =
-            expand_message(quote! { msg = "m" }, quote! { struct M { x: usize } }).unwrap();
-        let pretty = prettyplease::unparse(&syn::parse2::<syn::File>(expanded).unwrap());
+        let pretty = expand_parse_unparse(quote! { msg = "m" }, quote! { struct M { x: usize } });
         assert!(pretty.contains("pub const ORIGIN"));
         assert!(pretty.contains("CARGO_PKG_NAME"));
         assert!(pretty.contains("pub const TAGS"));

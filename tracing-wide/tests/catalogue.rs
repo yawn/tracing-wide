@@ -96,7 +96,8 @@ fn catalogue_registers_message_descriptors() {
     assert_eq!(Level::from(d.level), Level::WARN);
     assert_eq!(d.doc, Some("Emitted when a service finishes starting up."));
     assert_eq!(d.deprecated, None);
-    assert!(d.meta.contains(&("owner", "platform")));
+    assert_eq!(d.meta.get("owner"), Some("platform"));
+    assert!(d.meta.iter().eq(common::Started::META));
     assert_eq!(d.tags.to_vec(), ["platform", "startup"]);
     assert_eq!(d.origin.krate, "tracing-wide");
     assert!(d.origin.file.ends_with("common.rs"));
@@ -113,7 +114,7 @@ fn catalogue_registers_message_descriptors() {
 
     let attempt = d.fields.iter().find(|f| f.name == "attempt").unwrap();
 
-    assert!(attempt.meta.contains(&("unit", "count")));
+    assert_eq!(attempt.meta.get("unit"), Some("count"));
 
     let legacy = d.fields.iter().find(|f| f.name == "legacy_id").unwrap();
 
@@ -179,31 +180,46 @@ fn catalogue_reports_duplicate_ids_with_their_definition_sites() {
 mod catalogue_facet {
     use tracing_wide::message;
 
-    /// Exercises every customized descriptor field: struct deprecation, field
-    /// docs, meta (map), level (name), tags, and origin (compact string).
-    #[message(msg = "facet catalogue probe", id = "facet.probe", level = warn, owner = "platform", tags = ["b", "a"])]
+    use super::descriptor;
+
+    /// No meta on the message and none on its field.
+    #[message(msg = "facet catalogue bare")]
+    #[allow(dead_code)]
+    struct Bare {
+        n: usize,
+    }
+
+    /// Exercises every customized descriptor field; the meta keys are written out of sorted order.
+    #[message(msg = "facet catalogue probe", id = "facet.probe", level = warn, team = "core", owner = "platform", tags = ["b", "a"])]
     #[deprecated = "demo"]
     #[allow(dead_code)]
     struct Probe {
         /// A documented field.
-        #[field(unit = "ms")]
+        #[field(unit = "ms", agg = "sum")]
         duration: usize,
     }
 
-    /// The facet manifest must match the serde manifest field-for-field: the
-    /// whole point of the proxies (compact origin, map meta, level name).
+    /// The facet manifest must match the serde manifest byte for byte, so as text: a `serde_json::Value` sorts keys.
     #[test]
     fn descriptor_serializes_identically_under_serde_and_facet() {
-        let descriptor = tracing_wide::catalogue::all()
-            .find(|d| d.msg == "facet catalogue probe")
-            .expect("Probe is registered");
+        let d = descriptor("facet catalogue probe");
+        let via_serde = serde_json::to_string(d).unwrap();
 
-        let via_serde = serde_json::to_value(descriptor).unwrap();
-        let via_facet: serde_json::Value =
-            serde_json::from_str(&facet_json::to_string(descriptor).unwrap()).unwrap();
+        assert_eq!(via_serde, facet_json::to_string(d).unwrap());
 
-        assert_eq!(via_serde, via_facet);
+        assert!(!via_serde.contains(r#""id""#), "{via_serde}");
+    }
 
-        assert!(via_serde.get("id").is_none());
+    /// Both frameworks omit `meta` when it is empty, at the message and at the field level.
+    #[test]
+    fn empty_meta_is_omitted_under_serde_and_facet() {
+        let d = descriptor("facet catalogue bare");
+
+        for json in [
+            serde_json::to_string(d).unwrap(),
+            facet_json::to_string(d).unwrap(),
+        ] {
+            assert!(!json.contains(r#""meta""#), "{json}");
+        }
     }
 }

@@ -27,8 +27,8 @@ Highlights include:
   fields on the surrounding `tracing::instrument` span, across crate boundaries.
 - Sinks: each event reaches registered sinks as a typed `&dyn Message`
   *before* the `tracing` handoff; stay generic via accessors or downcast.
-- Routing: on static `tags()` with no downcast, or (with `facet`) on live
-  field values read by name.
+- Routing: on static `tags()` or `meta()` with no downcast, or (with `facet`) on
+  live field values read by name.
 
 ## Getting started
 

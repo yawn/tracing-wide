@@ -12,6 +12,7 @@
 use core::any::Any;
 use core::fmt;
 
+pub use meta::Meta;
 pub use tracing_wide_macros::{event, message};
 
 #[cfg(doc)]
@@ -27,6 +28,7 @@ pub use ::facet;
 pub mod catalogue;
 #[cfg(feature = "instrument")]
 pub mod instrument;
+mod meta;
 #[cfg(feature = "sink")]
 pub mod sink;
 
@@ -55,6 +57,9 @@ pub trait Message: __private::MessageBehaviour {
 
     /// Severity of this event type; `#[message(level = ...)]`, default `INFO`.
     fn level(&self) -> tracing::Level;
+
+    /// Metadata from `#[message(key = <literal>)]`; empty when none is given.
+    fn meta(&self) -> Meta;
 
     /// The constant, static message text.
     fn msg(&self) -> &'static str;

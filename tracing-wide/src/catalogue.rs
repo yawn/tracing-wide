@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use tracing::Level;
 
-use crate::Origin;
+use crate::{Meta, Origin};
 
 /// One field's catalogue metadata.
 #[derive(Debug)]
@@ -20,13 +20,10 @@ pub struct FieldDescriptor {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "facet", facet(skip_serializing_if = Option::is_none))]
     pub doc: Option<&'static str>,
-    /// The pairs of `#[field(key = ...)]`, serialized as a map.
-    #[cfg_attr(
-        feature = "serde",
-        serde(skip_serializing_if = "pairs_empty", serialize_with = "serde::pairs")
-    )]
-    #[cfg_attr(feature = "facet", facet(proxy = MetaMap, skip_serializing_if = pairs_empty))]
-    pub meta: &'static [(&'static str, &'static str)],
+    /// The pairs of `#[field(key = ...)]`: a map, not serialized when empty.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Meta::is_empty"))]
+    #[cfg_attr(feature = "facet", facet(skip_serializing_if = Meta::is_empty))]
+    pub meta: Meta,
     pub name: &'static str,
     /// Field type as written (e.g. `"& 'static str"`, `"Option < usize >"`).
     #[cfg_attr(feature = "facet", facet(rename = "type"))]
@@ -68,13 +65,10 @@ pub struct MessageDescriptor {
     pub id: Option<&'static str>,
     /// Severity, recorded as its canonical name: see [`LevelName`].
     pub level: LevelName,
-    /// The pairs of `#[message(key = ...)]` other than `msg`, `level`, and `tags`, serialized as a map.
-    #[cfg_attr(
-        feature = "serde",
-        serde(skip_serializing_if = "pairs_empty", serialize_with = "serde::pairs")
-    )]
-    #[cfg_attr(feature = "facet", facet(proxy = MetaMap, skip_serializing_if = pairs_empty))]
-    pub meta: &'static [(&'static str, &'static str)],
+    /// The pairs of `#[message(key = ...)]` other than `msg`, `id`, `level`, `tags`: a map, not serialized when empty.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Meta::is_empty"))]
+    #[cfg_attr(feature = "facet", facet(skip_serializing_if = Meta::is_empty))]
+    pub meta: Meta,
     /// The event text and the fallback id; not serialized, because the manifest keys its entries by the resolved id.
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "facet", facet(skip))]
@@ -124,36 +118,7 @@ impl From<LevelName> for Level {
     }
 }
 
-/// Facet proxy that renders the `meta` pairs as a map; serialize-only.
-#[cfg(feature = "facet")]
-#[derive(::facet::Facet)]
-#[facet(transparent)]
-struct MetaMap(std::collections::BTreeMap<&'static str, &'static str>);
-
-// Infallible, but facet's `proxy` mechanism is defined in terms of `TryFrom`.
-#[cfg(feature = "facet")]
-#[allow(clippy::infallible_try_from)]
-impl TryFrom<&&'static [(&'static str, &'static str)]> for MetaMap {
-    type Error = core::convert::Infallible;
-    fn try_from(pairs: &&'static [(&'static str, &'static str)]) -> Result<Self, Self::Error> {
-        Ok(MetaMap(pairs.iter().copied().collect()))
-    }
-}
-
-#[cfg(feature = "facet")]
-impl TryFrom<MetaMap> for &'static [(&'static str, &'static str)] {
-    type Error = &'static str;
-    fn try_from(_: MetaMap) -> Result<Self, Self::Error> {
-        Err("the catalogue is serialize-only")
-    }
-}
-
-/// Omit-when-empty predicates for serde and facet.
-#[cfg(any(feature = "serde", feature = "facet"))]
-fn pairs_empty(pairs: &&'static [(&'static str, &'static str)]) -> bool {
-    pairs.is_empty()
-}
-
+/// Omit-when-empty predicate for serde and facet.
 #[cfg(any(feature = "serde", feature = "facet"))]
 fn tags_empty(tags: &&'static [&'static str]) -> bool {
     tags.is_empty()
@@ -162,25 +127,13 @@ fn tags_empty(tags: &&'static [&'static str]) -> bool {
 /// Serde shims; the name shadows the `serde` crate, so the derives write `::serde`.
 #[cfg(feature = "serde")]
 mod serde {
-    use ::serde::{Serializer, ser::SerializeMap};
+    use ::serde::Serializer;
 
     use crate::Origin;
 
     /// Render an [`Origin`] as its compact `Display` string.
     pub(super) fn origin<S: Serializer>(origin: &Origin, s: S) -> Result<S::Ok, S::Error> {
         s.collect_str(origin)
-    }
-
-    /// Render the `meta` pairs as a map.
-    pub(super) fn pairs<S: Serializer>(
-        pairs: &&'static [(&'static str, &'static str)],
-        s: S,
-    ) -> Result<S::Ok, S::Error> {
-        let mut map = s.serialize_map(Some(pairs.len()))?;
-        for (k, v) in pairs.iter() {
-            map.serialize_entry(k, v)?;
-        }
-        map.end()
     }
 }
 

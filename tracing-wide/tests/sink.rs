@@ -1,4 +1,4 @@
-//! The sink registry: `install`, thread-local scopes, fan-out, order, and the `facet` hook in a sink.
+//! The sink registry: `install`, thread-local scopes, fan-out, order, meta routing, and the `facet` hook in a sink.
 //! Each test scopes its sinks to its own thread to run isolated; only one test installs the global set.
 #![cfg(feature = "sink")]
 
@@ -11,6 +11,11 @@ use tracing_wide::{Message, event, message};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_test::wasm_bindgen_test;
+
+/// Carries `owner = "billing"`, the pair that `MetaRouter` selects.
+#[message(msg = "invoice settled", owner = "billing")]
+#[derive(Default)]
+struct BillingEvent {}
 
 /// Emitted only inside thread-local scopes, so it never reaches the sinks of another test.
 #[message(msg = "captured event", level = error)]
@@ -29,6 +34,9 @@ struct FacetProbe(Arc<Mutex<Vec<usize>>>);
 #[derive(Default)]
 struct GlobalEvent {}
 
+/// Keeps the `msg` of each message whose meta has `owner = "billing"`.
+struct MetaRouter(Arc<Mutex<Vec<&'static str>>>);
+
 /// Emitted only under `with_default(OrderTracing)`: tracing caches callsite interest globally, so an emit without a
 /// tracing subscriber disables the callsite for the test that runs second.
 #[message(msg = "ordered event", level = error)]
@@ -41,10 +49,15 @@ struct OrderMarker(Arc<Mutex<Vec<&'static str>>>);
 /// A tracing subscriber that logs `"record"` for each event.
 struct OrderTracing(Arc<Mutex<Vec<&'static str>>>);
 
-/// The message of the scope tests; [`ReentrantEmitter`] answers it with a [`Pong`].
+/// The message of the scope tests and the meta routing test; [`ReentrantEmitter`] answers it with a [`Pong`].
 #[message(msg = "ping")]
 #[derive(Default)]
 struct Ping {}
+
+/// Carries `owner = "platform"`, which `MetaRouter` must skip.
+#[message(msg = "node drained", owner = "platform")]
+#[derive(Default)]
+struct PlatformEvent {}
 
 #[message(msg = "pong")]
 #[derive(Default)]
@@ -83,6 +96,14 @@ impl Sink for FacetProbe {
             && let Ok(n) = field.get::<usize>()
         {
             self.0.lock().unwrap().push(*n);
+        }
+    }
+}
+
+impl Sink for MetaRouter {
+    fn on_message(&self, m: &dyn Message) {
+        if m.meta().get("owner") == Some("billing") {
+            self.0.lock().unwrap().push(m.msg());
         }
     }
 }
@@ -231,6 +252,24 @@ fn global_install_is_set_once_and_a_scope_overrides_it() {
     event!(GlobalEvent::default()); // -> global again, scope ended
 
     assert_eq!(*log.lock().unwrap(), vec!["global", "scoped", "global"]);
+}
+
+/// A sink routes on `#[message(owner = ...)]` read off a live `&dyn Message`, with no `catalogue` join.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn meta_routes_a_live_message_with_no_catalogue_join() {
+    let routed = Arc::new(Mutex::new(Vec::new()));
+
+    let mut sinks = Sinks::default();
+    sinks.register(Box::new(MetaRouter(routed.clone())));
+
+    sinks.with_default(|| {
+        event!(BillingEvent {});
+        event!(PlatformEvent {});
+        event!(Ping {});
+    });
+
+    assert_eq!(*routed.lock().unwrap(), vec!["invoice settled"]);
 }
 
 /// A sink that emits from `on_message` re-enters dispatch and reaches the same set.

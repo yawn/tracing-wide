@@ -12,6 +12,11 @@ Pre-1.0, a breaking change bumps the minor version.
 
 - Example `metrics`, deriving OpenTelemetry metrics from messages in a sink and
   printing them with the stdout exporter.
+- `Message::meta()`, returning the new `Meta` type, and the `META` inherent
+  const: message-level `#[message(key = "value")]` pairs, readable off a live
+  `&dyn Message` and looked up with `Meta::get`. A sink that routes on metadata
+  no longer needs a `TypeId` → `MessageDescriptor` join, and so no longer needs
+  the `catalogue` feature in the application.
 - `#[message(id = "...")]` and `Message::id()`: a stable join key, resolved
   `id` → `msg` → type name. Sinks read the event name off a live `&dyn Message`
   with no catalogue join. `MessageDescriptor` keeps the raw `Option` id
@@ -25,6 +30,9 @@ Pre-1.0, a breaking change bumps the minor version.
   `tracing::Subscriber`. The module, the cargo feature and the examples follow:
   `subscriber` is now `sink`, `subscriber-facet` is `sink-facet`, and
   `subscriber-serde` is `sink-serde`.
+- **Breaking:** `FieldDescriptor::meta` and `MessageDescriptor::meta` are a `Meta`
+  instead of a `&'static [(&'static str, &'static str)]`. Read a value with
+  `meta.get(key)` and every pair with `meta.iter()`.
 - **Breaking:** `catalogue::duplicates()` returns
   `BTreeMap<&'static str, Vec<&'static MessageDescriptor>>` instead of
   `Vec<&'static str>`. A bare id cannot say *which* definitions collided, which
@@ -44,6 +52,12 @@ Pre-1.0, a breaking change bumps the minor version.
 - **Breaking:** `msg` must be non-empty and free of leading or trailing
   whitespace, the same two rules as `id`. `msg` is the fallback `id`, so the
   default path could otherwise produce the empty join key `id` rejects.
+
+### Fixed
+
+- Metadata pairs are sorted by key at expansion. The serde manifest wrote them in
+  the order written while the facet manifest sorted them, so the two manifests
+  differed for any `meta` with two or more keys.
 
 ## [0.2.0] - 2026-06-29
 
