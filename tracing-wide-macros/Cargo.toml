@@ -19,3 +19,4 @@ syn = { version = "2.0", features = ["full"] }
 
 [dev-dependencies]
 prettyplease = "0.2"
+proptest = { version = "1.12", default-features = false, features = ["std"] }

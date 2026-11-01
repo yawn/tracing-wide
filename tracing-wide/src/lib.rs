@@ -397,3 +397,29 @@ pub mod __private {
         }
     }
 }
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use proptest::prelude::*;
+
+    use super::precedes;
+
+    /// Strings of up to three characters from NUL, ASCII, a two-byte, and a four-byte character.
+    fn short() -> impl Strategy<Value = String> {
+        prop::collection::vec(
+            prop::sample::select(vec!['\0', 'a', 'b', 'é', '\u{10FFFF}']),
+            0..4,
+        )
+        .prop_map(String::from_iter)
+    }
+
+    proptest! {
+        /// `precedes` orders like `str`'s `Ord`; the shared prefix leaves the decision to the suffixes.
+        #[test]
+        fn precedes_orders_like_str((prefix, a, b) in (short(), short(), short())) {
+            let (a, b) = (format!("{prefix}{a}"), format!("{prefix}{b}"));
+
+            prop_assert_eq!(precedes(&a, &b), a < b);
+        }
+    }
+}

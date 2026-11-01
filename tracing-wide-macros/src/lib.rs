@@ -615,14 +615,37 @@ fn str_lit<'a>(nv: &'a MetaNameValue, key: &str) -> syn::Result<&'a LitStr> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use proc_macro2::Span;
+    use proptest::prelude::*;
     use quote::quote;
+    use syn::{LitInt, parse_quote};
+
+    use super::*;
 
     /// Expands `#[message(attr)]` on `item`, parses the output as a file, and pretty-prints it.
     fn expand_parse_unparse(attr: TokenStream2, item: TokenStream2) -> String {
         let expanded = expand_message(attr, item).expect("expansion succeeds");
 
         prettyplease::unparse(&syn::parse2::<syn::File>(expanded).expect("output is valid Rust"))
+    }
+
+    /// `n` in `radix`, with an `_` after each digit that `underscores` marks, and then `suffix`.
+    fn spell(n: u64, radix: u32, underscores: &[bool], suffix: &str) -> String {
+        let (prefix, digits) = match radix {
+            2 => ("0b", format!("{n:b}")),
+            8 => ("0o", format!("{n:o}")),
+            16 => ("0x", format!("{n:x}")),
+            _ => ("", n.to_string()),
+        };
+        let marks = underscores.iter().chain(std::iter::repeat(&false));
+        let digits: String = digits
+            .chars()
+            .zip(marks)
+            .flat_map(|(c, &mark)| [Some(c), mark.then_some('_')])
+            .flatten()
+            .collect();
+
+        format!("{prefix}{digits}{suffix}")
     }
 
     #[test]
@@ -901,5 +924,39 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.to_string().contains("array of string literals"));
+    }
+
+    proptest! {
+        /// A value passes exactly when it is non-empty and starts and ends with a non-whitespace character.
+        #[test]
+        fn join_keys_are_non_empty_and_trimmed(
+            chars in prop::collection::vec(
+                prop::sample::select(vec![' ', '\t', '\u{85}', '\u{200B}', '\u{2029}', '\u{3000}', 'a', 'é']),
+                0..5,
+            ),
+        ) {
+            let value = String::from_iter(chars);
+            let visible = |c: Option<char>| c.is_some_and(|c| !c.is_whitespace());
+            let expected = visible(value.chars().next()) && visible(value.chars().next_back());
+
+            prop_assert_eq!(non_empty_trimmed(&LitStr::new(&value, Span::call_site()), "id").is_ok(), expected);
+        }
+
+        /// Any spelling of an integer literal becomes the decimal digits of its value.
+        #[test]
+        fn meta_values_spell_integers_in_base_10(
+            n in any::<u64>(),
+            radix in prop::sample::select(vec![2u32, 8, 10, 16]),
+            underscores in prop::collection::vec(any::<bool>(), 0..70),
+            suffix in prop::sample::select(vec!["", "u64", "u128", "i128"]),
+        ) {
+            let lit = LitInt::new(&spell(n, radix, &underscores, suffix), Span::call_site());
+            let pair: MetaNameValue = parse_quote!(k = #lit);
+            let mut meta = MetaAttr::default();
+
+            meta.push(&pair).unwrap();
+
+            prop_assert_eq!(&meta.0["k"], &n.to_string());
+        }
     }
 }
