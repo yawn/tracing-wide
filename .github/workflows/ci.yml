@@ -89,7 +89,8 @@ jobs:
 
   # The release jobs live here, gated by `needs:`, because crates.io refuses
   # trusted publishing from a `workflow_run` trigger. On crates.io, both crates
-  # trust workflow ci.yml. A push checkout is on main at the commit CI tested.
+  # trust workflow ci.yml in environment `release`. A push checkout is on main
+  # at the commit CI tested.
 
   # Maintains the release PR: bumps the workspace version + the macros `=` pin.
   # Never publishes. (changelog_update is off: CHANGELOG.md is hand-written.)
@@ -130,6 +131,9 @@ jobs:
     needs: [lint, test, wasm]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
+    # crates.io trusts ci.yml only in this environment, and the environment
+    # admits only main: a branch that edits ci.yml can't mint a publish token.
+    environment: release
     permissions:
       contents: write # push the tags
       pull-requests: read # detect the merged release PR
