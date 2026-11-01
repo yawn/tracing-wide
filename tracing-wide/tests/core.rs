@@ -163,10 +163,21 @@ fn emit_omits_a_none_deprecated_field_but_records_some() {
 fn emit_records_a_braced_msg_verbatim() {
     assert_eq!(Braced::MSG, "rate {limit} hit");
 
-    let events = Collector::collect(KvGrab::fields, || event!(Braced::default()));
+    let events = Collector::collect(
+        |event| (*event.metadata().level(), KvGrab::fields(event)),
+        || event!(Braced::default()),
+    );
 
-    assert_eq!(events.len(), 1);
-    assert!(events[0].contains(&("message".to_string(), "rate {limit} hit".to_string())));
+    assert_eq!(
+        events,
+        [(
+            Level::INFO,
+            vec![
+                ("message".to_string(), "rate {limit} hit".to_string()),
+                ("n".to_string(), "0".to_string()),
+            ]
+        )]
+    );
 }
 
 /// Each rung of the width ladder records every one of its fields. See the note
