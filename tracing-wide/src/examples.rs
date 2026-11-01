@@ -1,72 +1,26 @@
-//! # Examples
-//!
-//! ## `catalogue-serde`
-//!
-#![doc = "```rust,ignore"]
-#![doc = include_str!("../examples/catalogue-serde.rs")]
-#![doc = "```"]
-#![doc = ""]
-#![doc = include_str!("../examples/output/catalogue-serde.md")]
+//! The runnable programs of `examples/`: one module per example, with its source and its output.
 
-//!
-//! ## `catalogue-facet`
-//!
-#![doc = "```rust,ignore"]
-#![doc = include_str!("../examples/catalogue-facet.rs")]
-#![doc = "```"]
-#![doc = ""]
-#![doc = include_str!("../examples/output/catalogue-facet.md")]
+/// Declares one module per example: its summary, the source of `examples/<file>.rs`, and its recorded output.
+macro_rules! examples {
+    ($($module:ident = $file:literal => $summary:literal;)*) => {$(
+        #[doc = $summary]
+        #[doc = ""]
+        #[doc = "```rust,ignore"]
+        #[doc = include_str!(concat!("../examples/", $file, ".rs"))]
+        #[doc = "```"]
+        #[doc = ""]
+        #[doc = include_str!(concat!("../examples/output/", $file, ".md"))]
+        pub mod $module {}
+    )*};
+}
 
-//!
-//! ## `instrument`
-//!
-#![doc = "```rust,ignore"]
-#![doc = include_str!("../examples/instrument.rs")]
-#![doc = "```"]
-#![doc = ""]
-#![doc = include_str!("../examples/output/instrument.md")]
-
-//!
-//! ## `metrics`
-//!
-#![doc = "```rust,ignore"]
-#![doc = include_str!("../examples/metrics.rs")]
-#![doc = "```"]
-#![doc = ""]
-#![doc = include_str!("../examples/output/metrics.md")]
-
-//!
-//! ## `sink-serde`
-//!
-#![doc = "```rust,ignore"]
-#![doc = include_str!("../examples/sink-serde.rs")]
-#![doc = "```"]
-#![doc = ""]
-#![doc = include_str!("../examples/output/sink-serde.md")]
-
-//!
-//! ## `sink`
-//!
-#![doc = "```rust,ignore"]
-#![doc = include_str!("../examples/sink.rs")]
-#![doc = "```"]
-#![doc = ""]
-#![doc = include_str!("../examples/output/sink.md")]
-
-//!
-//! ## `tags`
-//!
-#![doc = "```rust,ignore"]
-#![doc = include_str!("../examples/tags.rs")]
-#![doc = "```"]
-#![doc = ""]
-#![doc = include_str!("../examples/output/tags.md")]
-
-//!
-//! ## `sink-facet`
-//!
-#![doc = "```rust,ignore"]
-#![doc = include_str!("../examples/sink-facet.rs")]
-#![doc = "```"]
-#![doc = ""]
-#![doc = include_str!("../examples/output/sink-facet.md")]
+examples! {
+    catalogue_facet = "catalogue-facet" => "Dump the catalogue as YAML via `facet-yaml`.";
+    catalogue_serde = "catalogue-serde" => "Dump the catalogue as YAML via `serde`.";
+    instrument = "instrument" => "Fill `Option` fields from surrounding spans.";
+    metrics = "metrics" => "Derive OpenTelemetry metrics from messages in a sink.";
+    sink = "sink" => "A generic line printer plus a typed downcasting sink.";
+    sink_facet = "sink-facet" => "Filter on a live field value via `as_facet`.";
+    sink_serde = "sink-serde" => "Forward each event as JSON via `as_serialize`.";
+    tags = "tags" => "Route messages by tag with no downcast.";
+}

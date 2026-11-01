@@ -47,10 +47,10 @@ event!(Hello { who: "world" });
 
 ## Examples
 
-- [`catalogue-facet`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#catalogue-facet): dump the catalogue as YAML via `facet-yaml`
-- [`catalogue-serde`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#catalogue-serde): dump the catalogue as YAML via `serde`
-- [`instrument`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#instrument): fill `Option` fields from surrounding spans
-- [`sink-facet`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#sink-facet): filter on a live field value via `as_facet`
-- [`sink-serde`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#sink-serde): forward each event as JSON via `as_serialize`
-- [`sink`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#sink): a generic line printer plus a typed downcasting sink
-- [`tags`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#tags): route messages by tag with no downcast
+- [`catalogue-facet`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/catalogue_facet/index.html): dump the catalogue as YAML via `facet-yaml`
+- [`catalogue-serde`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/catalogue_serde/index.html): dump the catalogue as YAML via `serde`
+- [`instrument`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/instrument/index.html): fill `Option` fields from surrounding spans
+- [`sink-facet`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/sink_facet/index.html): filter on a live field value via `as_facet`
+- [`sink-serde`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/sink_serde/index.html): forward each event as JSON via `as_serialize`
+- [`sink`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/sink/index.html): a generic line printer plus a typed downcasting sink
+- [`tags`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/tags/index.html): route messages by tag with no downcast
