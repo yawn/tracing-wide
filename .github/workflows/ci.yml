@@ -110,13 +110,13 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      # 1.95.0, not stable: cargo-semver-checks 0.48 reads only rustdoc JSON
-      # v56/v57, and release-plz 0.3.159 reports a failed check as compatible.
+      # 1.95.0, not stable: cargo-semver-checks reads only the rustdoc JSON
+      # formats it knows (0.51: v57/v60/v61); a newer stable fails the check.
       - &toolchain-release
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: "1.95.0"
-      - uses: release-plz/action@e8792575c7f2366cf6ff3ccc33ead9ace5b691c7 # v0.5.130
+      - uses: release-plz/action@8921286633dfa0c4020f7f30bd1c14fe19cbb10e # v0.5.142
         with:
           command: release-pr
         env:
@@ -140,7 +140,7 @@ jobs:
     steps:
       - *checkout-history
       - *toolchain-release
-      - uses: release-plz/action@e8792575c7f2366cf6ff3ccc33ead9ace5b691c7 # v0.5.130
+      - uses: release-plz/action@8921286633dfa0c4020f7f30bd1c14fe19cbb10e # v0.5.142
         with:
           command: release
         env:
