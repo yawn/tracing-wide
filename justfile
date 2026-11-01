@@ -55,7 +55,7 @@ test-examples: # set TRYCMD=overwrite when examples have changed
 test-native:
     cargo test -p tracing-wide --no-default-features {{TESTS}}
     cargo test -p tracing-wide --all-features {{TESTS}}
-    cargo test --workspace --all-features --lib
+    cargo test --workspace --exclude tracing-wide --all-features --lib
     cargo test --workspace --all-features --doc
     cargo test -p tracing-wide --all-features --test ui
 
