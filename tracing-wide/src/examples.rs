@@ -27,22 +27,22 @@
 #![doc = include_str!("../examples/output/instrument.md")]
 
 //!
-//! ## `subscriber-serde`
+//! ## `sink-serde`
 //!
 #![doc = "```rust,ignore"]
-#![doc = include_str!("../examples/subscriber-serde.rs")]
+#![doc = include_str!("../examples/sink-serde.rs")]
 #![doc = "```"]
 #![doc = ""]
-#![doc = include_str!("../examples/output/subscriber-serde.md")]
+#![doc = include_str!("../examples/output/sink-serde.md")]
 
 //!
-//! ## `subscriber`
+//! ## `sink`
 //!
 #![doc = "```rust,ignore"]
-#![doc = include_str!("../examples/subscriber.rs")]
+#![doc = include_str!("../examples/sink.rs")]
 #![doc = "```"]
 #![doc = ""]
-#![doc = include_str!("../examples/output/subscriber.md")]
+#![doc = include_str!("../examples/output/sink.md")]
 
 //!
 //! ## `tags`
@@ -54,10 +54,10 @@
 #![doc = include_str!("../examples/output/tags.md")]
 
 //!
-//! ## `subscriber-facet`
+//! ## `sink-facet`
 //!
 #![doc = "```rust,ignore"]
-#![doc = include_str!("../examples/subscriber-facet.rs")]
+#![doc = include_str!("../examples/sink-facet.rs")]
 #![doc = "```"]
 #![doc = ""]
-#![doc = include_str!("../examples/output/subscriber-facet.md")]
+#![doc = include_str!("../examples/output/sink-facet.md")]

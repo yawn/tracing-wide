@@ -1,12 +1,12 @@
 //! Filtering on a message *field* with facet reflection.
 //!
-//! Run: `just example-subscriber-facet`
+//! Run: `just example-sink-facet`
 
 use tracing_wide::{
     Message, event,
     facet::{Facet, HasFields},
     message,
-    subscriber::{Subscriber, Subscribers},
+    sink::{Sink, Sinks},
 };
 
 #[message(msg = "request completed", tags = ["http"])]
@@ -29,7 +29,7 @@ struct RegionFilter {
     want: &'static str,
 }
 
-impl Subscriber for RegionFilter {
+impl Sink for RegionFilter {
     fn on_message(&self, m: &dyn Message) {
         if let Some(peek) = m.as_facet()
             && let Ok(body) = peek.into_struct()
@@ -56,9 +56,9 @@ impl Subscriber for RegionFilter {
 }
 
 fn main() {
-    let mut subscribers = Subscribers::default();
-    subscribers.register(Box::new(RegionFilter { want: "eu" }));
-    subscribers.install().ok();
+    let mut sinks = Sinks::default();
+    sinks.register(Box::new(RegionFilter { want: "eu" }));
+    sinks.install().ok();
 
     // Same types and tags; only `region` differs, which a tag cannot filter on.
     event!(RequestCompleted {

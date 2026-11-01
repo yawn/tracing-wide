@@ -27,13 +27,13 @@ pub use ::facet;
 pub mod catalogue;
 #[cfg(feature = "instrument")]
 pub mod instrument;
-#[cfg(feature = "subscriber")]
-pub mod subscriber;
+#[cfg(feature = "sink")]
+pub mod sink;
 
 /// Marker for a type that can be a message field; implemented for every `tracing::field::Value`.
 pub trait Field: tracing::field::Value {}
 
-/// A struct that `event!` emits; subscribers receive it as `&dyn Message`. Only `#[message]` implements it.
+/// A struct that `event!` emits; sinks receive it as `&dyn Message`. Only `#[message]` implements it.
 pub trait Message: __private::MessageBehaviour {
     /// The concrete message, for `as_any().downcast_ref::<T>()`.
     fn as_any(&self) -> &dyn Any;
@@ -223,13 +223,13 @@ pub mod __private {
 
     /// The recording side of [`Message`](crate::Message); only `#[message]` implements it.
     pub trait MessageBehaviour: Sealed {
-        /// The entry point of `event!`: fans out to subscribers, then records to tracing.
+        /// The entry point of `event!`: fans out to sinks, then records to tracing.
         fn emit(&self)
         where
             Self: crate::Message + Sized,
         {
-            #[cfg(feature = "subscriber")]
-            crate::subscriber::dispatch(self);
+            #[cfg(feature = "sink")]
+            crate::sink::dispatch(self);
             self.record();
         }
 

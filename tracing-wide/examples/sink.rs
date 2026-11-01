@@ -1,10 +1,10 @@
-//! Typed subscriber fan-out.
+//! Typed sink fan-out.
 //!
-//! Run: `just example-subscriber`
+//! Run: `just example-sink`
 
 use tracing_wide::{
     Message, event, message,
-    subscriber::{Subscriber, Subscribers},
+    sink::{Sink, Sinks},
 };
 
 struct Lines;
@@ -24,13 +24,13 @@ struct Started {
 /// A typed sink: downcasts to the one type it cares about and reads real fields.
 struct StartupWatch;
 
-impl Subscriber for Lines {
+impl Sink for Lines {
     fn on_message(&self, m: &dyn Message) {
         println!("[line] {:5} {}", m.level().to_string(), m.msg());
     }
 }
 
-impl Subscriber for StartupWatch {
+impl Sink for StartupWatch {
     fn on_message(&self, m: &dyn Message) {
         if let Some(started) = m.as_any().downcast_ref::<Started>() {
             println!(
@@ -42,10 +42,10 @@ impl Subscriber for StartupWatch {
 }
 
 fn main() {
-    let mut subscribers = Subscribers::default();
-    subscribers.register(Box::new(Lines));
-    subscribers.register(Box::new(StartupWatch));
-    subscribers.install().ok();
+    let mut sinks = Sinks::default();
+    sinks.register(Box::new(Lines));
+    sinks.register(Box::new(StartupWatch));
+    sinks.install().ok();
 
     event!(Started {
         service: "billing",

@@ -1,11 +1,11 @@
-//! Serializing messages from a subscriber.
+//! Serializing messages from a sink.
 //!
-//! Run: `just example-subscriber-serde`
+//! Run: `just example-sink-serde`
 
 use serde::Serialize;
 use tracing_wide::{
     Message, event, message,
-    subscriber::{Subscriber, Subscribers},
+    sink::{Sink, Sinks},
 };
 
 struct JsonForwarder;
@@ -24,7 +24,7 @@ struct Started {
     service: &'static str,
 }
 
-impl Subscriber for JsonForwarder {
+impl Sink for JsonForwarder {
     fn on_message(&self, m: &dyn Message) {
         let Some(fields) = m.as_serialize() else {
             return;
@@ -41,9 +41,9 @@ impl Subscriber for JsonForwarder {
 }
 
 fn main() {
-    let mut subscribers = Subscribers::default();
-    subscribers.register(Box::new(JsonForwarder));
-    subscribers.install().ok();
+    let mut sinks = Sinks::default();
+    sinks.register(Box::new(JsonForwarder));
+    sinks.install().ok();
 
     event!(Started {
         service: "billing",

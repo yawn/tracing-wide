@@ -1,18 +1,18 @@
-//! The subscriber registry: `install`, thread-local scopes, fan-out, order, and the `facet` hook in a subscriber.
-//! Each test scopes its subscribers to its own thread to run isolated; only one test installs the global set.
-#![cfg(feature = "subscriber")]
+//! The sink registry: `install`, thread-local scopes, fan-out, order, and the `facet` hook in a sink.
+//! Each test scopes its sinks to its own thread to run isolated; only one test installs the global set.
+#![cfg(feature = "sink")]
 
 use core::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 use tracing::Level;
-use tracing_wide::subscriber::{Subscriber, Subscribers};
+use tracing_wide::sink::{Sink, Sinks};
 use tracing_wide::{Message, event, message};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_test::wasm_bindgen_test;
 
-/// Emitted only inside thread-local scopes, so it never reaches the subscribers of another test.
+/// Emitted only inside thread-local scopes, so it never reaches the sinks of another test.
 #[message(msg = "captured event", level = error)]
 #[derive(Default)]
 #[cfg_attr(feature = "facet", derive(tracing_wide::facet::Facet))]
@@ -35,7 +35,7 @@ struct GlobalEvent {}
 #[derive(Default)]
 struct OrderedEvent {}
 
-/// A second subscriber that only logs that dispatch reached it.
+/// A second sink that only logs that dispatch reached it.
 struct OrderMarker(Arc<Mutex<Vec<&'static str>>>);
 
 /// A tracing subscriber that logs `"record"` for each event.
@@ -71,7 +71,7 @@ impl<M> Tagger<M> {
 }
 
 #[cfg(feature = "facet")]
-impl Subscriber for FacetProbe {
+impl Sink for FacetProbe {
     fn on_message(&self, m: &dyn Message) {
         if m.as_any().downcast_ref::<CapturedEvent>().is_none() {
             return;
@@ -87,7 +87,7 @@ impl Subscriber for FacetProbe {
     }
 }
 
-impl Subscriber for OrderMarker {
+impl Sink for OrderMarker {
     fn on_message(&self, m: &dyn Message) {
         if m.as_any().downcast_ref::<CapturedEvent>().is_some() {
             self.0.lock().unwrap().push("dispatch");
@@ -117,7 +117,7 @@ impl tracing::Subscriber for OrderTracing {
     fn exit(&self, _: &tracing::span::Id) {}
 }
 
-impl Subscriber for Recorder {
+impl Sink for Recorder {
     fn on_message(&self, m: &dyn Message) {
         if let Some(e) = m.as_any().downcast_ref::<CapturedEvent>() {
             self.0.lock().unwrap().push((m.msg(), m.level(), e.n));
@@ -125,7 +125,7 @@ impl Subscriber for Recorder {
     }
 }
 
-impl Subscriber for ReentrantEmitter {
+impl Sink for ReentrantEmitter {
     fn on_message(&self, m: &dyn Message) {
         if m.as_any().downcast_ref::<Ping>().is_some() {
             self.0.lock().unwrap().push("ping");
@@ -136,7 +136,7 @@ impl Subscriber for ReentrantEmitter {
     }
 }
 
-impl<M: 'static> Subscriber for Tagger<M> {
+impl<M: 'static> Sink for Tagger<M> {
     fn on_message(&self, m: &dyn Message) {
         if m.as_any().downcast_ref::<M>().is_some() {
             self.1.lock().unwrap().push(self.0);
@@ -144,18 +144,18 @@ impl<M: 'static> Subscriber for Tagger<M> {
     }
 }
 
-/// Dispatch reaches every registered subscriber.
+/// Dispatch reaches every registered sink.
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
-fn dispatch_fans_out_to_every_subscriber() {
+fn dispatch_fans_out_to_every_sink() {
     let captured = Arc::new(Mutex::new(Vec::new()));
     let order = Arc::new(Mutex::new(Vec::new()));
 
-    let mut subs = Subscribers::default();
-    subs.register(Box::new(Recorder(captured.clone())));
-    subs.register(Box::new(OrderMarker(order.clone())));
+    let mut sinks = Sinks::default();
+    sinks.register(Box::new(Recorder(captured.clone())));
+    sinks.register(Box::new(OrderMarker(order.clone())));
 
-    subs.with_default(|| {
+    sinks.with_default(|| {
         event!(CapturedEvent { n: 7 });
     });
 
@@ -172,13 +172,13 @@ fn dispatch_fans_out_to_every_subscriber() {
 fn dispatch_precedes_the_tracing_handoff() {
     let order = Arc::new(Mutex::new(Vec::new()));
 
-    let mut subs = Subscribers::default();
-    subs.register(Box::new(Tagger::<OrderedEvent>::new(
+    let mut sinks = Sinks::default();
+    sinks.register(Box::new(Tagger::<OrderedEvent>::new(
         "dispatch",
         order.clone(),
     )));
 
-    subs.with_default(|| {
+    sinks.with_default(|| {
         tracing::subscriber::with_default(OrderTracing(order.clone()), || {
             event!(OrderedEvent::default());
         });
@@ -187,17 +187,17 @@ fn dispatch_precedes_the_tracing_handoff() {
     assert_eq!(*order.lock().unwrap(), vec!["dispatch", "record"]);
 }
 
-/// A subscriber reads a field by name through the `facet` hook on `&dyn Message`.
+/// A sink reads a field by name through the `facet` hook on `&dyn Message`.
 #[cfg(feature = "facet")]
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn facet_hook_reads_a_field_through_dyn_message() {
     let reflected = Arc::new(Mutex::new(Vec::new()));
 
-    let mut subs = Subscribers::default();
-    subs.register(Box::new(FacetProbe(reflected.clone())));
+    let mut sinks = Sinks::default();
+    sinks.register(Box::new(FacetProbe(reflected.clone())));
 
-    subs.with_default(|| {
+    sinks.with_default(|| {
         event!(CapturedEvent { n: 7 });
     });
 
@@ -211,18 +211,18 @@ fn facet_hook_reads_a_field_through_dyn_message() {
 fn global_install_is_set_once_and_a_scope_overrides_it() {
     let log = Arc::new(Mutex::new(Vec::new()));
 
-    let mut global = Subscribers::default();
+    let mut global = Sinks::default();
     global.register(Box::new(Tagger::<GlobalEvent>::new("global", log.clone())));
 
     assert!(global.install().is_ok(), "first install wins");
     assert!(
-        Subscribers::default().install().is_err(),
+        Sinks::default().install().is_err(),
         "the registry installs exactly once"
     );
 
     event!(GlobalEvent::default()); // -> global
 
-    let mut scoped = Subscribers::default();
+    let mut scoped = Sinks::default();
     scoped.register(Box::new(Tagger::<GlobalEvent>::new("scoped", log.clone())));
     scoped.with_default(|| {
         event!(GlobalEvent::default()); // -> scoped, overriding the global
@@ -233,16 +233,16 @@ fn global_install_is_set_once_and_a_scope_overrides_it() {
     assert_eq!(*log.lock().unwrap(), vec!["global", "scoped", "global"]);
 }
 
-/// A subscriber that emits from `on_message` re-enters dispatch and reaches the same set.
+/// A sink that emits from `on_message` re-enters dispatch and reaches the same set.
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn scoped_dispatch_is_reentrant() {
     let log = Arc::new(Mutex::new(Vec::new()));
 
-    let mut subs = Subscribers::default();
-    subs.register(Box::new(ReentrantEmitter(log.clone())));
+    let mut sinks = Sinks::default();
+    sinks.register(Box::new(ReentrantEmitter(log.clone())));
 
-    subs.with_default(|| {
+    sinks.with_default(|| {
         event!(Ping::default());
     });
 
@@ -255,14 +255,14 @@ fn scoped_dispatch_is_reentrant() {
 fn set_default_guards_restore_the_previous_scope() {
     let log = Arc::new(Mutex::new(Vec::new()));
 
-    let mut outer = Subscribers::default();
+    let mut outer = Sinks::default();
     outer.register(Box::new(Tagger::<Ping>::new("outer", log.clone())));
     let outer_guard = outer.set_default();
 
     event!(Ping::default()); // -> outer
 
     {
-        let mut inner = Subscribers::default();
+        let mut inner = Sinks::default();
         inner.register(Box::new(Tagger::<Ping>::new("inner", log.clone())));
         let _inner_guard = inner.set_default();
         event!(Ping::default()); // -> inner
@@ -282,10 +282,10 @@ fn set_default_guards_restore_the_previous_scope() {
 fn with_default_scopes_to_the_closure_and_returns_its_value() {
     let log = Arc::new(Mutex::new(Vec::new()));
 
-    let mut subs = Subscribers::default();
-    subs.register(Box::new(Tagger::<Ping>::new("scoped", log.clone())));
+    let mut sinks = Sinks::default();
+    sinks.register(Box::new(Tagger::<Ping>::new("scoped", log.clone())));
 
-    let out = subs.with_default(|| {
+    let out = sinks.with_default(|| {
         event!(Ping::default());
         "result"
     });

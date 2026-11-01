@@ -8,6 +8,14 @@ Pre-1.0, a breaking change bumps the minor version.
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** renamed the fan-out trait `subscriber::Subscriber` to `sink::Sink` and
+  the set `Subscribers` to `Sinks`, so it no longer shares a name with
+  `tracing::Subscriber`. The module, the cargo feature and the examples follow:
+  `subscriber` is now `sink`, `subscriber-facet` is `sink-facet`, and
+  `subscriber-serde` is `sink-serde`.
+
 ## [0.2.0] - 2026-06-29
 
 ### Added

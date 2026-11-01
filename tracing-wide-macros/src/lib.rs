@@ -299,7 +299,7 @@ impl ToTokens for Tags {
     }
 }
 
-/// Emits a message: `event!(Started { service, attempt })` fills ambient fields, fans out to subscribers, and records
+/// Emits a message: `event!(Started { service, attempt })` fills ambient fields, fans out to sinks, and records
 /// to tracing.
 #[proc_macro]
 pub fn event(input: TokenStream) -> TokenStream {

@@ -1,4 +1,4 @@
-//! Cross-crate provenance and routing: a subscriber sees the `origin().krate` and `tags()` of messages from both this
+//! Cross-crate provenance and routing: a sink sees the `origin().krate` and `tags()` of messages from both this
 //! test crate and the foreign `integration_test_crate`, without specifying the foreign types. Runs on native and wasm;
 //! the wasm run also exercises cross-crate catalogue registration via module-init ctors.
 //!
@@ -21,17 +21,17 @@ struct OrderPlaced {
     id: usize,
 }
 
-#[allow(dead_code)] // only the `subscriber`-gated test calls this
+#[allow(dead_code)] // only the `sink`-gated test calls this
 fn place_order(id: usize) {
     event!(OrderPlaced { id });
 }
 
-#[cfg(feature = "subscriber")]
+#[cfg(feature = "sink")]
 mod routing {
     use std::sync::{Arc, Mutex};
 
     use tracing_wide::Message;
-    use tracing_wide::subscriber::{Subscriber, Subscribers};
+    use tracing_wide::sink::{Sink, Sinks};
 
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::wasm_bindgen_test;
@@ -44,7 +44,7 @@ mod routing {
     #[allow(clippy::type_complexity)]
     struct Recorder(Arc<Mutex<Vec<(&'static str, &'static str, Vec<&'static str>)>>>);
 
-    impl Subscriber for Recorder {
+    impl Sink for Recorder {
         fn on_message(&self, m: &dyn Message) {
             self.0
                 .lock()
@@ -55,12 +55,12 @@ mod routing {
 
     #[cfg_attr(not(target_arch = "wasm32"), test)]
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
-    fn subscriber_sees_origin_and_tags_from_both_crates() {
+    fn sink_sees_origin_and_tags_from_both_crates() {
         let log = Arc::new(Mutex::new(Vec::new()));
 
-        let mut subs = Subscribers::default();
-        subs.register(Box::new(Recorder(log.clone())));
-        subs.install().ok();
+        let mut sinks = Sinks::default();
+        sinks.register(Box::new(Recorder(log.clone())));
+        sinks.install().ok();
 
         integration_test_crate::grant("alice");
         integration_test_crate::write("orders/42");

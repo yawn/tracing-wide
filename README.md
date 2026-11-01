@@ -16,7 +16,7 @@ Highlights include:
 
 - Typed wide events: one struct per event via `#[message]`; `event!` checks
   required fields, fills unset `Option`s from the ambient span, fans out to
-  subscribers, then records to `tracing` at the type's level.
+  sinks, then records to `tracing` at the type's level.
 - Flexible serialization: none, `serde`, or `facet`; opt-in per type, never a
   bound on `Message`.
 - Catalogue: every linked-in message type, auto-registered and walkable as plain
@@ -25,7 +25,7 @@ Highlights include:
   message, object-safe and drift-free.
 - Ambient autocapture: `Option` fields fill at emit time from same-named
   fields on the surrounding `tracing::instrument` span, across crate boundaries.
-- Subscribers: each event reaches registered sinks as a typed `&dyn Message`
+- Sinks: each event reaches registered sinks as a typed `&dyn Message`
   *before* the `tracing` handoff; stay generic via accessors or downcast.
 - Routing: on static `tags()` with no downcast, or (with `facet`) on live
   field values read by name.
@@ -50,7 +50,7 @@ event!(Hello { who: "world" });
 - [`catalogue-facet`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#catalogue-facet): dump the catalogue as YAML via `facet-yaml`
 - [`catalogue-serde`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#catalogue-serde): dump the catalogue as YAML via `serde`
 - [`instrument`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#instrument): fill `Option` fields from surrounding spans
-- [`subscriber-facet`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#subscriber-facet): filter on a live field value via `as_facet`
-- [`subscriber-serde`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#subscriber-serde): forward each event as JSON via `as_serialize`
-- [`subscriber`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#subscriber): a generic line printer plus a typed downcasting sink
+- [`sink-facet`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#sink-facet): filter on a live field value via `as_facet`
+- [`sink-serde`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#sink-serde): forward each event as JSON via `as_serialize`
+- [`sink`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#sink): a generic line printer plus a typed downcasting sink
 - [`tags`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/index.html#tags): route messages by tag with no downcast

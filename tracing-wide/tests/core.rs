@@ -1,6 +1,6 @@
 //! Behavioral coverage for the feature-free core: `#[message]` consts, the
 //! `Message` trait surface, and the `event!` → tracing handoff. The per-feature
-//! suites (subscriber, catalogue, instrument, serde, facet) live in sibling test
+//! suites (sink, catalogue, instrument, serde, facet) live in sibling test
 //! files, so each compiles to its own binary and process-global state can't leak
 //! between feature areas.
 //!

@@ -39,13 +39,13 @@ instrument = ["dep:tracing-subscriber", "std"]
 ## `Serialize` too.
 serde = ["dep:serde", "dep:erased-serde", "std"]
 
-## Opt-in std - required for all features beyond core functionality.
-std = ["tracing/std"]
-
-## Typed `&dyn Message` fan-out to registered subscribers before the tracing handoff.
+## Typed `&dyn Message` fan-out to registered sinks before the tracing handoff.
 ##
 ## Application-only feature. Should only be enabled for applications, not for libraries.
-subscriber = ["std"]
+sink = ["std"]
+
+## Opt-in std - required for all features beyond core functionality.
+std = ["tracing/std"]
 
 [dependencies]
 tracing-wide-macros.workspace = true
@@ -87,23 +87,23 @@ required-features = ["catalogue", "serde"]
 
 [[example]]
 name = "instrument"
-required-features = ["instrument", "subscriber"]
+required-features = ["instrument", "sink"]
 
 [[example]]
-name = "subscriber"
-required-features = ["subscriber"]
+name = "sink"
+required-features = ["sink"]
 
 [[example]]
-name = "subscriber-facet"
-required-features = ["facet", "subscriber"]
+name = "sink-facet"
+required-features = ["facet", "sink"]
 
 [[example]]
-name = "subscriber-serde"
-required-features = ["subscriber", "serde"]
+name = "sink-serde"
+required-features = ["serde", "sink"]
 
 [[example]]
 name = "tags"
-required-features = ["subscriber"]
+required-features = ["sink"]
 
 [package.metadata.docs.rs]
-features = ["catalogue", "docs", "facet", "instrument", "serde", "std", "subscriber" ]
+features = ["catalogue", "docs", "facet", "instrument", "serde", "sink", "std" ]

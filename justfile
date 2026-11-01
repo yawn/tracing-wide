@@ -1,5 +1,5 @@
 HACK := "cargo hack --feature-powerset --exclude-features default,docs,std -p tracing-wide"
-TESTS := "--test core --test subscriber --test catalogue --test instrument --test serde --test facet --test cross_crate"
+TESTS := "--test core --test sink --test catalogue --test instrument --test serde --test facet --test cross_crate"
 
 check: check-native check-wasm
 
@@ -16,7 +16,7 @@ docs:
     rm -rf target/doc
     RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps
 
-examples: example-catalogue-facet example-catalogue-serde example-instrument example-subscriber example-subscriber-facet example-subscriber-serde example-tags
+examples: example-catalogue-facet example-catalogue-serde example-instrument example-sink example-sink-facet example-sink-serde example-tags
 
 example-catalogue-facet:
     cargo run --example catalogue-facet --features catalogue,facet
@@ -25,19 +25,19 @@ example-catalogue-serde:
     cargo run --example catalogue-serde --features catalogue,serde
 
 example-instrument:
-    cargo run --example instrument --features instrument,subscriber
+    cargo run --example instrument --features instrument,sink
 
-example-subscriber:
-    cargo run --example subscriber --features subscriber
+example-sink:
+    cargo run --example sink --features sink
 
-example-subscriber-facet:
-    cargo run --example subscriber-facet --features facet,subscriber
+example-sink-facet:
+    cargo run --example sink-facet --features facet,sink
 
-example-subscriber-serde:
-    cargo run --example subscriber-serde --features subscriber,serde
+example-sink-serde:
+    cargo run --example sink-serde --features serde,sink
 
 example-tags:
-    cargo run --example tags --features subscriber
+    cargo run --example tags --features sink
 
 lint: fmt-check clippy
 

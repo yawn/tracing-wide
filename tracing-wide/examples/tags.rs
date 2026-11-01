@@ -4,7 +4,7 @@
 
 use tracing_wide::{
     Message, event, message,
-    subscriber::{Subscriber, Subscribers},
+    sink::{Sink, Sinks},
 };
 
 /// Forwards anything tagged `analytics` (e.g. to an analytics pipeline).
@@ -32,7 +32,7 @@ struct PaymentCaptured {
     currency: &'static str,
 }
 
-impl Subscriber for Analytics {
+impl Sink for Analytics {
     fn on_message(&self, m: &dyn Message) {
         if m.tags().contains(&"analytics") {
             println!("[analytics] forward {:?}  ({})", m.msg(), m.origin());
@@ -40,7 +40,7 @@ impl Subscriber for Analytics {
     }
 }
 
-impl Subscriber for Database {
+impl Sink for Database {
     fn on_message(&self, m: &dyn Message) {
         if m.tags().contains(&"persist") {
             println!("[db]        store   {:?}  ({})", m.msg(), m.origin());
@@ -49,10 +49,10 @@ impl Subscriber for Database {
 }
 
 fn main() {
-    let mut subscribers = Subscribers::default();
-    subscribers.register(Box::new(Database));
-    subscribers.register(Box::new(Analytics));
-    subscribers.install().ok();
+    let mut sinks = Sinks::default();
+    sinks.register(Box::new(Database));
+    sinks.register(Box::new(Analytics));
+    sinks.install().ok();
 
     event!(PaymentCaptured {
         amount_cents: 4200,

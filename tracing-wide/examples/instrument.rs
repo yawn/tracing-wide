@@ -8,7 +8,7 @@ use tracing::instrument;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_wide::{
     Message, event, message,
-    subscriber::{Subscriber, Subscribers},
+    sink::{Sink, Sinks},
 };
 
 struct Park(Arc<Mutex<Option<WorkFinished>>>);
@@ -31,7 +31,7 @@ impl WorkFinished {
     }
 }
 
-impl Subscriber for Park {
+impl Sink for Park {
     fn on_message(&self, m: &dyn Message) {
         if let Some(work) = m.as_any().downcast_ref::<WorkFinished>() {
             *self.0.lock().unwrap() = Some(work.clone());
@@ -53,9 +53,9 @@ fn work(attempt: usize) {
 fn main() {
     let parked = Arc::new(Mutex::new(None));
 
-    let mut subscribers = Subscribers::default();
-    subscribers.register(Box::new(Park(parked.clone())));
-    subscribers.install().ok();
+    let mut sinks = Sinks::default();
+    sinks.register(Box::new(Park(parked.clone())));
+    sinks.install().ok();
 
     let subscriber = tracing_subscriber::registry()
         .with(tracing_wide::instrument::layer())
@@ -70,7 +70,7 @@ fn main() {
         .lock()
         .unwrap()
         .take()
-        .expect("the typed subscriber saw the event");
+        .expect("the typed sink saw the event");
 
     assert_eq!(work.payload, 42, "required field, from the literal");
 
