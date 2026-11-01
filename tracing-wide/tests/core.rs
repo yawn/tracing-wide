@@ -9,9 +9,7 @@
 
 mod common;
 
-use std::sync::{Arc, Mutex};
-
-use common::{Charged, KvGrab, Renamed, Started};
+use common::{Charged, Collector, KvGrab, Renamed, Started};
 use seq_macro::seq;
 use tracing::Level;
 use tracing_wide::{Message, event, message};
@@ -26,16 +24,6 @@ use wasm_bindgen_test::wasm_bindgen_test;
 struct Braced {
     n: usize,
 }
-
-/// A tracing subscriber that records each event's level and static message text.
-struct EventCollector(Arc<Mutex<Vec<(Level, String)>>>);
-
-/// Collects every recorded field of each event as `(name, rendered)` pairs.
-#[allow(clippy::type_complexity)]
-struct FieldCollector(Arc<Mutex<Vec<Vec<(String, String)>>>>);
-
-/// Pulls the static message text (the `message` field) out of an event.
-struct MessageGrab(Option<String>);
 
 /// A minimal event that takes the default level (INFO).
 #[message(msg = "plain event")]
@@ -86,65 +74,6 @@ seq!(N in 0..117 {
         }
     }
 });
-
-impl tracing::Subscriber for EventCollector {
-    fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
-        true
-    }
-
-    fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
-        tracing::span::Id::from_u64(1)
-    }
-
-    fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
-
-    fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
-
-    fn event(&self, event: &tracing::Event<'_>) {
-        let mut grab = MessageGrab(None);
-        event.record(&mut grab);
-        self.0
-            .lock()
-            .unwrap()
-            .push((*event.metadata().level(), grab.0.unwrap_or_default()));
-    }
-
-    fn enter(&self, _: &tracing::span::Id) {}
-
-    fn exit(&self, _: &tracing::span::Id) {}
-}
-
-impl tracing::Subscriber for FieldCollector {
-    fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
-        true
-    }
-
-    fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
-        tracing::span::Id::from_u64(1)
-    }
-
-    fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
-
-    fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
-
-    fn event(&self, event: &tracing::Event<'_>) {
-        let mut grab = KvGrab(Vec::new());
-        event.record(&mut grab);
-        self.0.lock().unwrap().push(grab.0);
-    }
-
-    fn enter(&self, _: &tracing::span::Id) {}
-
-    fn exit(&self, _: &tracing::span::Id) {}
-}
-
-impl tracing::field::Visit for MessageGrab {
-    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
-        if field.name() == "message" {
-            self.0 = Some(format!("{value:?}"));
-        }
-    }
-}
 
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -202,9 +131,7 @@ fn dyn_message_exposes_accessors_and_downcast() {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 #[allow(deprecated)]
 fn emit_omits_a_none_deprecated_field_but_records_some() {
-    let events = Arc::new(Mutex::new(Vec::new()));
-
-    tracing::subscriber::with_default(FieldCollector(events.clone()), || {
+    let events = Collector::collect(KvGrab::fields, || {
         event!(Started {
             service: "billing",
             attempt: 1,
@@ -216,8 +143,6 @@ fn emit_omits_a_none_deprecated_field_but_records_some() {
             legacy_id: Some(42),
         });
     });
-
-    let events = events.lock().unwrap();
 
     let names = |i: usize| {
         events[i]
@@ -238,14 +163,10 @@ fn emit_omits_a_none_deprecated_field_but_records_some() {
 fn emit_records_a_braced_msg_verbatim() {
     assert_eq!(Braced::MSG, "rate {limit} hit");
 
-    let log = Arc::new(Mutex::new(Vec::new()));
+    let events = Collector::collect(KvGrab::fields, || event!(Braced::default()));
 
-    tracing::subscriber::with_default(EventCollector(log.clone()), || {
-        event!(Braced::default());
-    });
-
-    let got = log.lock().unwrap();
-    assert_eq!(*got, vec![(Level::INFO, "rate {limit} hit".to_string())]);
+    assert_eq!(events.len(), 1);
+    assert!(events[0].contains(&("message".to_string(), "rate {limit} hit".to_string())));
 }
 
 /// Each rung of the width ladder records every one of its fields. See the note
@@ -274,22 +195,18 @@ fn emit_records_every_field_of_a_message_wider_than_the_documented_limit() {
         assert!(fields.contains(&("message".to_string(), msg.to_string())));
     }
 
-    let collect = |emit: &dyn Fn()| {
-        let events = Arc::new(Mutex::new(Vec::new()));
-        tracing::subscriber::with_default(FieldCollector(events.clone()), emit);
-        events.lock().unwrap().clone()
-    };
+    let collect = |emit: fn()| Collector::collect(KvGrab::fields, emit);
 
     assert_round_trip(
-        &collect(&|| event!(Narrower::seeded())),
+        &collect(|| event!(Narrower::seeded())),
         40,
         "narrow wide event",
     );
 
-    assert_round_trip(&collect(&|| event!(Wider::seeded())), 100, "wide event");
+    assert_round_trip(&collect(|| event!(Wider::seeded())), 100, "wide event");
 
     assert_round_trip(
-        &collect(&|| event!(EvenWider::seeded())),
+        &collect(|| event!(EvenWider::seeded())),
         117,
         "ceiling wide event",
     );
@@ -298,26 +215,24 @@ fn emit_records_every_field_of_a_message_wider_than_the_documented_limit() {
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn emit_records_to_tracing_at_the_typed_level() {
-    let log = Arc::new(Mutex::new(Vec::new()));
+    let levels = Collector::collect(
+        |event| *event.metadata().level(),
+        || {
+            event!(Started {
+                service: "billing",
+                attempt: 1,
+                ..Default::default()
+            });
+        },
+    );
 
-    tracing::subscriber::with_default(EventCollector(log.clone()), || {
-        event!(Started {
-            service: "billing",
-            attempt: 1,
-            ..Default::default()
-        });
-    });
-
-    let got = log.lock().unwrap();
-    assert_eq!(*got, vec![(Level::WARN, "service started".to_string())]);
+    assert_eq!(levels, [Level::WARN]);
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn emit_records_typed_field_values() {
-    let events = Arc::new(Mutex::new(Vec::new()));
-
-    tracing::subscriber::with_default(FieldCollector(events.clone()), || {
+    let events = Collector::collect(KvGrab::fields, || {
         event!(Started {
             service: "billing",
             attempt: 3,
@@ -325,7 +240,6 @@ fn emit_records_typed_field_values() {
         });
     });
 
-    let events = events.lock().unwrap();
     assert_eq!(events.len(), 1);
 
     let fields = &events[0];

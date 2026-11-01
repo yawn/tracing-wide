@@ -2,10 +2,14 @@
 //! Each test scopes its sinks to its own thread to run isolated; only one test installs the global set.
 #![cfg(feature = "sink")]
 
+mod common;
+
 use core::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
+use common::Collector;
 use tracing::Level;
+use tracing_subscriber::layer::SubscriberExt;
 use tracing_wide::sink::{Sink, Sinks};
 use tracing_wide::{Message, event, message};
 
@@ -37,7 +41,7 @@ struct GlobalEvent {}
 /// Keeps the `msg` of each message whose meta has `owner = "billing"`.
 struct MetaRouter(Arc<Mutex<Vec<&'static str>>>);
 
-/// Emitted only under `with_default(OrderTracing)`: tracing caches callsite interest globally, so an emit without a
+/// Emitted only under a tracing subscriber: tracing caches callsite interest globally, so an emit without a
 /// tracing subscriber disables the callsite for the test that runs second.
 #[message(msg = "ordered event", level = error)]
 #[derive(Default)]
@@ -45,9 +49,6 @@ struct OrderedEvent {}
 
 /// A second sink that only logs that dispatch reached it.
 struct OrderMarker(Arc<Mutex<Vec<&'static str>>>);
-
-/// A tracing subscriber that logs `"record"` for each event.
-struct OrderTracing(Arc<Mutex<Vec<&'static str>>>);
 
 /// The message of the scope tests and the meta routing test; [`ReentrantEmitter`] answers it with a [`Pong`].
 #[message(msg = "ping")]
@@ -116,28 +117,6 @@ impl Sink for OrderMarker {
     }
 }
 
-impl tracing::Subscriber for OrderTracing {
-    fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
-        true
-    }
-
-    fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
-        tracing::span::Id::from_u64(1)
-    }
-
-    fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
-
-    fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
-
-    fn event(&self, _: &tracing::Event<'_>) {
-        self.0.lock().unwrap().push("record");
-    }
-
-    fn enter(&self, _: &tracing::span::Id) {}
-
-    fn exit(&self, _: &tracing::span::Id) {}
-}
-
 impl Sink for Recorder {
     fn on_message(&self, m: &dyn Message) {
         if let Some(e) = m.as_any().downcast_ref::<CapturedEvent>() {
@@ -200,9 +179,10 @@ fn dispatch_precedes_the_tracing_handoff() {
     )));
 
     sinks.with_default(|| {
-        tracing::subscriber::with_default(OrderTracing(order.clone()), || {
-            event!(OrderedEvent::default());
-        });
+        let subscriber =
+            tracing_subscriber::registry().with(Collector(order.clone(), |_| "record"));
+
+        tracing::subscriber::with_default(subscriber, || event!(OrderedEvent::default()));
     });
 
     assert_eq!(*order.lock().unwrap(), vec!["dispatch", "record"]);
