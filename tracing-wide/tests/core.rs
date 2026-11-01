@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use common::{Charged, KvGrab, Renamed, Started};
 use seq_macro::seq;
 use tracing::Level;
-use tracing_wide::{Message, Meta, Tags, event, message};
+use tracing_wide::{Message, event, message};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -345,22 +345,6 @@ fn id_const_resolves_the_explicit_msg_type_name_chain() {
     assert_eq!(Renamed::ID, "Renamed");
 }
 
-/// `Meta` finds a value by key, lists its pairs, and reports when it has none.
-#[cfg_attr(not(target_arch = "wasm32"), test)]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
-fn meta_looks_up_and_lists_its_pairs() {
-    let meta = Meta::__new(&[("owner", "platform"), ("tier", "2")]);
-
-    assert!(!meta.is_empty());
-    assert!(Meta::default().is_empty());
-    assert_eq!(meta.get("team"), None);
-    assert_eq!(meta.get("tier"), Some("2"));
-    assert_eq!(
-        meta.iter().collect::<Vec<_>>(),
-        [("owner", "platform"), ("tier", "2")]
-    );
-}
-
 /// A message that declares no metadata returns an empty `Meta` through `&dyn Message`.
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -368,18 +352,6 @@ fn meta_of_a_message_without_pairs_is_empty() {
     let plain: &dyn Message = &Plain::default();
 
     assert!(plain.meta().is_empty());
-}
-
-/// `Tags` finds a tag, lists its tags, and reports when it has none.
-#[cfg_attr(not(target_arch = "wasm32"), test)]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
-fn tags_find_and_list_their_tags() {
-    let tags = Tags::__new(&["platform", "startup"]);
-
-    assert!(!tags.contains("billing"));
-    assert!(!tags.is_empty());
-    assert!(tags.contains("platform"));
-    assert_eq!(tags.iter().collect::<Vec<_>>(), ["platform", "startup"]);
 }
 
 /// A message that declares no tags returns an empty `Tags` through `&dyn Message`.

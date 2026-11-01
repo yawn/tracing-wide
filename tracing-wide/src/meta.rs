@@ -81,3 +81,39 @@ impl TryFrom<BTreeMap<&'static str, &'static str>> for Meta {
         Err("Meta is serialize-only in the catalogue")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    extern crate std;
+
+    use std::vec::Vec;
+
+    #[cfg(target_arch = "wasm32")]
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    use super::Meta;
+
+    /// `Meta` finds a value by key, lists its pairs, and reports when it has none.
+    #[cfg_attr(not(target_arch = "wasm32"), test)]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+    fn meta_looks_up_and_lists_its_pairs() {
+        let meta = Meta::__new(&[("owner", "platform"), ("tier", "2")]);
+
+        assert!(!meta.is_empty());
+        assert!(Meta::default().is_empty());
+        assert_eq!(meta.get("team"), None);
+        assert_eq!(meta.get("tier"), Some("2"));
+        assert_eq!(
+            meta.iter().collect::<Vec<_>>(),
+            [("owner", "platform"), ("tier", "2")]
+        );
+    }
+
+    /// `Meta::__new` rejects keys out of order.
+    #[cfg_attr(not(target_arch = "wasm32"), test)]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+    #[should_panic(expected = "`Meta` keys must be sorted and unique")]
+    fn meta_new_panics_on_unsorted_keys() {
+        Meta::__new(&[("tier", "2"), ("owner", "platform")]);
+    }
+}

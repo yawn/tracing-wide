@@ -400,6 +400,11 @@ pub mod __private {
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
+    extern crate std;
+
+    use std::string::String;
+    use std::{format, vec};
+
     use proptest::prelude::*;
 
     use super::precedes;

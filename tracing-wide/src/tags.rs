@@ -52,3 +52,35 @@ impl IntoIterator for Tags {
         self.0.iter().copied()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    extern crate std;
+
+    use std::vec::Vec;
+
+    #[cfg(target_arch = "wasm32")]
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    use super::Tags;
+
+    /// `Tags` finds a tag, lists its tags, and reports when it has none.
+    #[cfg_attr(not(target_arch = "wasm32"), test)]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+    fn tags_find_and_list_their_tags() {
+        let tags = Tags::__new(&["platform", "startup"]);
+
+        assert!(!tags.contains("billing"));
+        assert!(!tags.is_empty());
+        assert!(tags.contains("platform"));
+        assert_eq!(tags.iter().collect::<Vec<_>>(), ["platform", "startup"]);
+    }
+
+    /// `Tags::__new` rejects tags out of order.
+    #[cfg_attr(not(target_arch = "wasm32"), test)]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+    #[should_panic(expected = "`Tags` must be sorted and unique")]
+    fn tags_new_panics_on_unsorted_tags() {
+        Tags::__new(&["startup", "platform"]);
+    }
+}
