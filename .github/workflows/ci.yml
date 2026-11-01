@@ -28,7 +28,7 @@ jobs:
       # only the byte-identical steps are shared; rust-toolchain/install-action
       # vary per job and stay inline.
       - &checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
@@ -37,7 +37,7 @@ jobs:
           components: rustfmt, clippy
       - &rust-cache
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - uses: taiki-e/install-action@bffeee26d4db9be238a4ea78d8826604ebcb594d # v2.82.5
+      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
         with:
           tool: just
       # Confirm the pin won over rust-toolchain.toml's "stable" (see RUSTUP_TOOLCHAIN).
@@ -53,7 +53,7 @@ jobs:
         with:
           toolchain: "1.95.0"
       - *rust-cache
-      - uses: taiki-e/install-action@bffeee26d4db9be238a4ea78d8826604ebcb594d # v2.82.5
+      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
         with:
           tool: just,cargo-hack
       - run: rustc --version
@@ -78,10 +78,10 @@ jobs:
           toolchain: "1.95.0"
           targets: wasm32-unknown-unknown
       - *rust-cache
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "26"
-      - uses: taiki-e/install-action@bffeee26d4db9be238a4ea78d8826604ebcb594d # v2.82.5
+      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
         with:
           tool: just,cargo-hack,wasm-bindgen-cli@0.2.122
       - run: just check-wasm
@@ -107,7 +107,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - &checkout-history
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -117,7 +117,7 @@ jobs:
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: "1.95.0"
-      - uses: release-plz/action@8921286633dfa0c4020f7f30bd1c14fe19cbb10e # v0.5.142
+      - uses: release-plz/action@b2baf303c463c223526d52a8a91b0777f052cf3f # v0.5.146
         with:
           command: release-pr
         env:
@@ -144,7 +144,7 @@ jobs:
     steps:
       - *checkout-history
       - *toolchain-release
-      - uses: release-plz/action@8921286633dfa0c4020f7f30bd1c14fe19cbb10e # v0.5.142
+      - uses: release-plz/action@b2baf303c463c223526d52a8a91b0777f052cf3f # v0.5.146
         with:
           command: release
         env:

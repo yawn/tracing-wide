@@ -10,3 +10,8 @@ updates:
     # Let a new release age before we pin it.
     cooldown:
       default-days: 7
+    # One PR per run for every action update, so main gets one push and one
+    # CI run instead of one per action.
+    groups:
+      github-actions:
+        patterns: ["*"]
