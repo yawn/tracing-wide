@@ -1,5 +1,4 @@
-// `#[message]` takes no bare flags. The old `#[message(serialize)]` flag is gone —
-// serialization is keyed on `#[derive(Serialize)]` — so a bare flag is an error.
+// `#[message]` takes no bare flags; `#[derive(Serialize)]` opts into serialization.
 #[tracing_wide::message(serialize)]
 struct M {
     a: usize,

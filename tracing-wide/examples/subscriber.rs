@@ -1,13 +1,6 @@
 //! Typed subscriber fan-out.
 //!
 //! Run: `just example-subscriber`
-//!
-//! With the `subscriber` feature, `event!` hands each message to every
-//! registered [`Subscriber`] as a typed `&dyn Message` *before* the tracing
-//! handoff. A sink can stay generic (the object-safe accessors) or downcast to
-//! the concrete types it cares about — no string parsing, no `Visit`
-//! round-trip. The registry is set-once at startup, mirroring
-//! `tracing::subscriber::set_global_default`.
 
 use tracing_wide::{
     Message, event, message,

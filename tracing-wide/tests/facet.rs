@@ -1,6 +1,6 @@
 //! Coverage for the facet reflection hook (`facet` feature): `Message::as_facet`
 //! yields a `Peek` only for a `#[derive(Facet)]` message, walkable field-by-name
-//! and in declaration order without naming the concrete type.
+//! and in declaration order without specifying the concrete type.
 
 #![cfg(feature = "facet")]
 
@@ -13,7 +13,7 @@ use tracing_wide::{
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_test::wasm_bindgen_test;
 
-/// Does *not* opt in — and isn't `Facet`. Proves the hook never forces a
+/// Does *not* opt in: and isn't `Facet`. Proves the hook never forces a
 /// `Facet` bound on a message that didn't ask for it.
 #[message(msg = "opaque reflect event")]
 #[allow(dead_code)]

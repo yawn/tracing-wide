@@ -1,5 +1,4 @@
-// A type with no `tracing::field::Value` impl is not a `tracing_wide::Field`, so
-// `#[message]`'s per-field assertion rejects this at compile time.
+// A type without a `tracing::field::Value` impl is not a `Field`.
 struct NotAValue;
 
 #[tracing_wide::message(msg = "bad")]

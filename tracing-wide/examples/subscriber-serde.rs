@@ -1,12 +1,6 @@
 //! Serializing messages from a subscriber.
 //!
 //! Run: `just example-subscriber-serde`
-//!
-//! tracing-wide puts **no `Serialize` bound** on messages: a type opts in with
-//! `#[derive(Serialize)]` alone, and [`Message::as_serialize`] hands back an
-//! object-safe `&dyn erased_serde::Serialize` a subscriber can serialize with
-//! any format — no downcast, no per-type match. A type that doesn't derive
-//! `Serialize` simply yields `None`.
 
 use serde::Serialize;
 use tracing_wide::{

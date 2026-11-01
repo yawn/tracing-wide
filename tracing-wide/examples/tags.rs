@@ -1,11 +1,6 @@
 //! Subsystem selection by tag.
 //!
-//! Run: `just example-routing`
-//!
-//! Tags are *routing intent*: a subscriber decides where each message goes from
-//! its `tags()` — no downcast, no per-type match — and a single message can
-//! fan out to several subsystems. `origin()` is printed alongside; in a
-//! multi-crate app it enables routing on `(origin, tag)` together.
+//! Run: `just example-tags`
 
 use tracing_wide::{
     Message, event, message,
@@ -18,7 +13,7 @@ struct Analytics;
 /// Persists anything tagged `persist` (e.g. to a database).
 struct Database;
 
-/// Persistence only (and a higher level) — never reaches analytics.
+/// Persistence only (and a higher level): never reaches analytics.
 #[message(msg = "config changed", level = warn, tags = ["audit", "persist"])]
 struct ConfigChanged {
     key: &'static str,
@@ -30,7 +25,7 @@ struct PageViewed {
     path: &'static str,
 }
 
-/// Tagged for both analytics and persistence — fans out to *both* subsystems.
+/// Tagged for both analytics and persistence: fans out to *both* subsystems.
 #[message(msg = "payment captured", tags = ["analytics", "persist"])]
 struct PaymentCaptured {
     amount_cents: u64,

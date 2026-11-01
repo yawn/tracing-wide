@@ -1,4 +1,4 @@
-# release-plz configuration — https://release-plz.dev/docs/config
+# release-plz configuration: https://release-plz.dev/docs/config
 [workspace]
 changelog_update = false
 semver_check = true

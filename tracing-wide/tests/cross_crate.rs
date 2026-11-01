@@ -1,14 +1,12 @@
-//! Cross-crate provenance & routing: a subscriber sees messages — with their
-//! automatic `origin().krate` and their `tags()` — from BOTH this test crate
-//! and the foreign `integration_test_crate`, without ever naming the foreign
-//! types. Dual native/wasm, like `coverage.rs`; the wasm run also exercises
-//! cross-crate catalogue registration via module-init ctors.
+//! Cross-crate provenance and routing: a subscriber sees the `origin().krate` and `tags()` of messages from both this
+//! test crate and the foreign `integration_test_crate`, without specifying the foreign types. Runs on native and wasm;
+//! the wasm run also exercises cross-crate catalogue registration via module-init ctors.
 //!
 //! This file also holds the *emitting* half of the very-wide-message proof.
 //! `integration_test_crate` defines a 500-field message under
 //! `#![recursion_limit = "1024"]`; this crate deliberately keeps rustc's default
 //! limit of 128 and emits it anyway. Do not add a `recursion_limit` attribute
-//! here — its absence is the assertion.
+//! here: its absence is the assertion.
 
 use tracing_wide::{event, message};
 
@@ -17,7 +15,7 @@ use tracing_wide::{event, message};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 /// A message defined in *this* crate (so `origin().krate == "tracing-wide"`),
-/// tagged for persistence — a distinct origin from the foreign crate's messages.
+/// tagged for persistence: a distinct origin from the foreign crate's messages.
 #[message(msg = "order placed", tags = ["persist"])]
 struct OrderPlaced {
     id: usize,
@@ -41,8 +39,8 @@ mod routing {
     use super::place_order;
 
     /// Type-agnostic sink: records `(origin crate, msg, tags)` for *every*
-    /// message through the object-safe accessors — it never downcasts, so it
-    /// observes the foreign crate's messages without naming their types.
+    /// message through the object-safe accessors: it never downcasts, so it
+    /// observes the foreign crate's messages without specifying their types.
     #[allow(clippy::type_complexity)]
     struct Recorder(Arc<Mutex<Vec<(&'static str, &'static str, Vec<&'static str>)>>>);
 
@@ -93,16 +91,6 @@ mod routing {
     }
 }
 
-/// The emitting half of the very-wide-message proof. `integration_test_crate`
-/// raised its own `recursion_limit` to define a 500-field message; this crate
-/// did not, and still records every field — because `#[message]` expands
-/// `tracing::info!` at the definition site, so only the defining crate spends
-/// recursion budget. `tests/core.rs` pins the other side of this: what the
-/// ceiling is when nobody raises the limit.
-///
-/// The collector is local rather than shared with `core.rs` via `common`: this
-/// binary's catalogue registrations are asserted below, and pulling in
-/// `common`'s message fixtures would change what it registers.
 mod very_wide {
     use std::sync::{Arc, Mutex};
 
@@ -185,7 +173,7 @@ mod very_wide {
 fn catalogue_registers_descriptors_from_both_crates() {
     use tracing_wide::catalogue;
 
-    // Force-link the foreign crate: taking its fn pointers pulls in its
+    // Force linking of the foreign crate: taking its fn pointers pulls in its
     // inventory registrations even in feature combos where no other (gated)
     // test references it.
     let _link: [fn(&'static str); 2] =

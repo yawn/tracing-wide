@@ -1,6 +1,6 @@
 //! Coverage for the serde hook (`serde` feature): `Message::as_serialize` yields
 //! `Some` only for a `#[derive(Serialize)]` message, and serializes the body
-//! whole without naming the concrete type.
+//! whole without specifying the concrete type.
 
 #![cfg(feature = "serde")]
 
@@ -10,7 +10,7 @@ use tracing_wide::{Message, message};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_test::wasm_bindgen_test;
 
-/// Does *not* opt in — and isn't `Serialize`. Proves the hook never forces
+/// Does *not* opt in: and isn't `Serialize`. Proves the hook never forces
 /// a `Serialize` bound on messages that didn't ask for it.
 #[message(msg = "opaque event")]
 #[allow(dead_code)]

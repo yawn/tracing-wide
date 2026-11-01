@@ -1,8 +1,4 @@
-//! Compile-fail coverage: the *negative* guarantees the behavioral suite can't
-//! express — the pseudo-seals reject accidental hand-written impls, the `Field`
-//! bound rejects bad field types, `event!` rejects non-messages, and
-//! `#[message]` validates its arguments. trybuild shells out to cargo, so this
-//! is native-only.
+//! Compile-fail tests: the seals, the `Field` bound, `event!` input, and `#[message]` arguments. Native only.
 #![cfg(not(target_arch = "wasm32"))]
 
 #[test]

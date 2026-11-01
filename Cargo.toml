@@ -10,7 +10,7 @@ repository = "https://github.com/yawn/tracing-wide"
 rust-version = "1.91" # required for const TypeId::of
 version = "0.2.0"
 
-# Exact pin: the macro expansions and the runtime crate are one unit — version
+# Exact pin: the macro expansions and the runtime crate are one unit: version
 # skew between them is never supported. Keep in lockstep with
 # `workspace.package.version` above when releasing (Cargo cannot reference it).
 [workspace.dependencies]

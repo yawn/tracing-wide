@@ -3,7 +3,7 @@ description = "Wide structured events for tokio `tracing`: define a struct per e
 name = "tracing-wide"
 readme = "README.md"
 # The tests need `integration-test-crate`, a path-only dev-dependency Cargo
-# strips on publish — they could never build from the package.
+# strips on publish: they could never build from the package.
 exclude = ["/tests"]
 
 edition.workspace = true
@@ -16,49 +16,33 @@ version.workspace = true
 [features]
 default = [ "std" ]
 
-## Documentation-only: pulls in every dependency and rendering needed to build
-## the full rustdoc (currently `document-features`, which renders this list).
-## Enabled by docs.rs and `just docs`; never needed by applications or libraries.
+## Builds the full rustdoc (docs.rs, `just docs`); never needed by applications or libraries.
 docs = ["dep:document-features"]
 
-## Auto-collected per-type catalogue: inventory registration + descriptors. On its
-## own the descriptors are plain data; add `serde` and they gain `Serialize`.
+## The catalogue of every message type; with `serde`, its descriptors are `Serialize`.
 ##
-## Tooling-only feature. Should neither be enabled for applications nor libraries.
+## Enable it only where the catalogue is read, such as an xtask, a dedicated bin, or a test; never in a library.
 catalogue = ["dep:inventory", "std"]
 
-## Facet reflection integration. The `as_facet` hook on `Message` hands a subscriber a
-## `facet::Peek` over a live message body — enabled per type by `#[derive(Facet)]` alone
-## — for *introspection*: pull fields out by name and filter on an individual field, not
-## just on tags. Distinct from `serde`, which forwards the body whole; this pulls it apart.
+## `Message::as_facet`: a `facet::Peek` over a live message whose type derives `Facet`, to read fields by name.
 ##
-## Unstable: facet is pre-1.0 and every minor is a breaking change, so this feature tracks
-## that churn — expect breakage. facet is re-exported as `tracing_wide::facet` so a
-## subscriber names `Peek`/`Facet`/the derive through one coherent version.
+## Unstable: tracks facet, where every minor version breaks. Specify facet types through the `tracing_wide::facet` re-export.
 facet = ["dep:facet", "std"]
 
-## Instrument integration (ambient autocapture): a tracing-subscriber `Layer`
-## that captures span field values — i.e. what `tracing::instrument` records —
-## and an emit-time join that fills a message's still-`None` `Option` fields by
-## name from the current span scope. Only `Option` fields join; a miss is legal
-## (`None`). Requires the app's subscriber to be built on
-## `tracing_subscriber::registry()` with `instrument::layer()` installed —
-## without them, `event!` degrades gracefully (fields stay `None`).
+## Ambient autocapture: `event!` fills still-`None` `Option` fields from the span scope. Needs
+## `instrument::layer()` on a `tracing_subscriber::registry()` stack; without it, the fields stay `None`.
 ##
 ## Application-only feature. Should only be enabled for applications, not for libraries.
 instrument = ["dep:tracing-subscriber", "std"]
 
-## Serde integration. On its own: the erased-serde hook on `Message` (`as_serialize`)
-## that lets a subscriber serialize a live message body without naming its concrete
-## type — enabled per type by `#[derive(Serialize)]` alone. Combined with `catalogue`,
-## the catalogue descriptors also derive `Serialize` (for dumping to JSON/TOML).
+## `Message::as_serialize` for a message whose type derives `Serialize`; with `catalogue`, the descriptors are
+## `Serialize` too.
 serde = ["dep:serde", "dep:erased-serde", "std"]
 
 ## Opt-in std - required for all features beyond core functionality.
 std = ["tracing/std"]
 
-## Global subscriber registry + typed `&dyn Message` fan-out that
-## runs before the tracing handoff. Without it, `event!` just records to tracing.
+## Typed `&dyn Message` fan-out to registered subscribers before the tracing handoff.
 ##
 ## Application-only feature. Should only be enabled for applications, not for libraries.
 subscriber = ["std"]

@@ -1,13 +1,6 @@
 //! Filtering on a message *field* with facet reflection.
 //!
 //! Run: `just example-subscriber-facet`
-//!
-//! Tags route by type — fixed at definition, identical for every instance. Some
-//! routing is about the *data*: "only the `eu` region". That's per-event and
-//! can't be a tag. With the `facet` feature, [`Message::as_facet`] hands back a
-//! [`facet::Peek`] over the live body, so a subscriber pulls a field out *by
-//! name* and filters on its runtime value — no downcast, no per-type match. A
-//! type that doesn't derive `Facet` simply yields `None`.
 
 use tracing_wide::{
     Message, event,
@@ -67,8 +60,7 @@ fn main() {
     subscribers.register(Box::new(RegionFilter { want: "eu" }));
     subscribers.install().ok();
 
-    // Same types, same tags — only `region` differs. The filter keeps the `eu`
-    // events and drops the rest, which tags alone could never do.
+    // Same types and tags; only `region` differs, which a tag cannot filter on.
     event!(RequestCompleted {
         region: "eu",
         route: "/users/:id",

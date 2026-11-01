@@ -1,5 +1,4 @@
-//! The auto-collected catalogue: per-type descriptors registered by `#[message]`
-//! and read back at runtime. Gated as a whole by the `catalogue` feature.
+//! The catalogue: one descriptor per message type, registered by `#[message]` (feature `catalogue`).
 
 use core::any::TypeId;
 use std::collections::HashMap;
@@ -13,8 +12,7 @@ use crate::Origin;
 #[cfg_attr(feature = "serde", derive(::serde::Serialize))]
 #[cfg_attr(feature = "facet", derive(::facet::Facet))]
 pub struct FieldDescriptor {
-    /// `Some` iff the field carries `#[deprecated]` — the reason, or `"true"`
-    /// when none is given. Serialized only when present.
+    /// The `#[deprecated]` reason, `"true"` without one; not serialized when `None`.
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "facet", facet(skip_serializing_if = Option::is_none))]
     pub deprecated: Option<&'static str>,
@@ -22,8 +20,7 @@ pub struct FieldDescriptor {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "facet", facet(skip_serializing_if = Option::is_none))]
     pub doc: Option<&'static str>,
-    /// Arbitrary k/v from `#[field(key = ...)]`. Rendered as a map under both
-    /// frameworks — serde via `serde::pairs`, facet via the `MetaMap` proxy.
+    /// The pairs of `#[field(key = ...)]`, serialized as a map.
     #[cfg_attr(
         feature = "serde",
         serde(skip_serializing_if = "pairs_empty", serialize_with = "serde::pairs")
@@ -36,13 +33,7 @@ pub struct FieldDescriptor {
     pub r#type: &'static str,
 }
 
-/// A message's severity — a mirror of `tracing::Level`'s five levels.
-///
-/// `tracing::Level` is neither `Serialize` nor `Facet` (and foreign, so the
-/// catalogue can't implement either) and its variants are sealed, so the level is
-/// recorded as this enum. It renders as the canonical name (`"WARN"`) under both
-/// frameworks and converts back with `Level::from`. The variant names are
-/// SCREAMING so both serializers emit the exact tracing names with no rename.
+/// A serializable mirror of `tracing::Level`, with its exact names; `Level::from` converts back.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(::serde::Serialize))]
 #[cfg_attr(feature = "facet", derive(::facet::Facet))]
@@ -61,10 +52,7 @@ pub enum LevelName {
 #[cfg_attr(feature = "serde", derive(::serde::Serialize))]
 #[cfg_attr(feature = "facet", derive(::facet::Facet))]
 pub struct MessageDescriptor {
-    /// `Some` iff the message type carries `#[deprecated]` — the reason, or
-    /// `"true"` when none is given (`since` is not captured). Producers get
-    /// rustc's native warning; the catalogue records the intent. Serialized
-    /// only when present.
+    /// The `#[deprecated]` reason, `"true"` without one; not serialized when `None`.
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "facet", facet(skip_serializing_if = Option::is_none))]
     pub deprecated: Option<&'static str>,
@@ -73,43 +61,34 @@ pub struct MessageDescriptor {
     #[cfg_attr(feature = "facet", facet(skip_serializing_if = Option::is_none))]
     pub doc: Option<&'static str>,
     pub fields: &'static [FieldDescriptor],
-    /// Severity, recorded as its canonical name — see [`LevelName`].
+    /// Severity, recorded as its canonical name: see [`LevelName`].
     pub level: LevelName,
-    /// Arbitrary k/v from `#[message(key = ...)]` (everything but `msg`/`level`),
-    /// rendered as a map — serde via `serde::pairs`, facet via the `MetaMap` proxy.
+    /// The pairs of `#[message(key = ...)]` other than `msg`, `level`, and `tags`, serialized as a map.
     #[cfg_attr(
         feature = "serde",
         serde(skip_serializing_if = "pairs_empty", serialize_with = "serde::pairs")
     )]
     #[cfg_attr(feature = "facet", facet(proxy = MetaMap, skip_serializing_if = pairs_empty))]
     pub meta: &'static [(&'static str, &'static str)],
-    /// The unique join key. Excluded from serialization: a serialized catalogue
-    /// keys its entries by `msg` (see the `catalogue-serde` example), so rendering it
-    /// inside the entry too would duplicate the key.
+    /// The unique join key; not serialized, because a serialized catalogue keys its entries by it.
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "facet", facet(skip))]
     pub msg: &'static str,
-    /// Where this message type is defined; serialized via its compact
-    /// [`Display`](crate::Origin) — a single string like `mycrate src/lib.rs:12:1`,
-    /// not a nested map (serde via `serde::origin`, facet via the proxy on [`Origin`]).
+    /// Where the type is defined; serialized as its `Display` string.
     #[cfg_attr(feature = "serde", serde(serialize_with = "serde::origin"))]
     pub origin: Origin,
-    /// Routing tags: sorted, deduped, lowercased. The common (untagged) case is
-    /// empty and stays quiet in the manifest.
+    /// Routing tags: sorted, deduped, lowercase; not serialized when empty.
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "tags_empty"))]
     #[cfg_attr(feature = "facet", facet(skip_serializing_if = tags_empty))]
     pub tags: &'static [&'static str],
-    /// Runtime identity — the join key from a live `&dyn Message` via
-    /// `m.as_any().type_id()`. Opaque and build-local, so excluded from
-    /// serialization.
+    /// Joins a live message by `m.as_any().type_id()`; build-local, so not serialized.
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "facet", facet(skip))]
     pub type_id: TypeId,
 }
 
 impl LevelName {
-    /// The canonical level name, e.g. `"WARN"` — a `&'static str` (which
-    /// `AsRef<str>` could not preserve).
+    /// The canonical name, e.g. `"WARN"`.
     pub const fn as_str(&self) -> &'static str {
         match self {
             LevelName::TRACE => "TRACE",
@@ -133,11 +112,7 @@ impl From<LevelName> for Level {
     }
 }
 
-/// Facet proxy for the `meta` k/v slices: reflecting a `&[(k, v)]` directly
-/// yields an array of pairs, but the manifest wants a map — so the `meta` fields
-/// proxy through this `BTreeMap` newtype, which facet renders as an object (serde
-/// gets the same shape from `serde::pairs`). Serialize-only; the catalogue is
-/// never deserialized, so the reverse conversion is a stub.
+/// Facet proxy that renders the `meta` pairs as a map; serialize-only.
 #[cfg(feature = "facet")]
 #[derive(::facet::Facet)]
 #[facet(transparent)]
@@ -161,8 +136,7 @@ impl TryFrom<MetaMap> for &'static [(&'static str, &'static str)] {
     }
 }
 
-/// Omit-when-empty predicates shared by serde and facet (both keep the common
-/// unannotated/untagged case quiet in the manifest).
+/// Omit-when-empty predicates for serde and facet.
 #[cfg(any(feature = "serde", feature = "facet"))]
 fn pairs_empty(pairs: &&'static [(&'static str, &'static str)]) -> bool {
     pairs.is_empty()
@@ -173,10 +147,7 @@ fn tags_empty(tags: &&'static [&'static str]) -> bool {
     tags.is_empty()
 }
 
-/// The serde-specific serialization shims, grouped behind one gate. A *local*
-/// module deliberately named `serde` so the attribute paths above read as
-/// `serde::pairs` etc.; it shadows the crate inside this file, which is why the
-/// derives above name the crate absolutely (`::serde`).
+/// Serde shims; the name shadows the `serde` crate, so the derives write `::serde`.
 #[cfg(feature = "serde")]
 mod serde {
     use ::serde::{Serializer, ser::SerializeMap};
@@ -188,8 +159,7 @@ mod serde {
         s.collect_str(origin)
     }
 
-    /// Render `meta` k/v slices as a map (a YAML/JSON mapping), not an array
-    /// of pairs.
+    /// Render the `meta` pairs as a map.
     pub(super) fn pairs<S: Serializer>(
         pairs: &&'static [(&'static str, &'static str)],
         s: S,
@@ -202,24 +172,15 @@ mod serde {
     }
 }
 
-/// Iterate every registered message type. Populated at load time (before
-/// `main` natively; via `__wasm_call_ctors` on wasm). Joinable to emitted
-/// events by `MSG`.
+/// Every registered message type; registered before `main` (on wasm, by `__wasm_call_ctors`).
 pub fn all() -> impl Iterator<Item = &'static MessageDescriptor> {
     inventory::iter::<MessageDescriptor>.into_iter()
 }
 
-/// The `msg` values registered by more than one message type — `msg` is the
-/// catalogue's unique join key, so an empty result is the invariant. A proc
-/// macro cannot enforce this (each expansion is blind to its siblings), so the
-/// check is a runtime walk; its natural home is a test in the *application*
-/// crate, where every linked-in message is registered:
+/// The `msg` values that more than one message type registers; must be empty. Check it in an application test:
 ///
 /// ```ignore
-/// #[test]
-/// fn catalogue_msgs_are_unique() {
-///     assert_eq!(tracing_wide::catalogue::duplicates(), Vec::<&str>::new());
-/// }
+/// assert_eq!(tracing_wide::catalogue::duplicates(), Vec::<&str>::new());
 /// ```
 pub fn duplicates() -> Vec<&'static str> {
     let mut counts = HashMap::new();

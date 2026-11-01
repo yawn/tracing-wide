@@ -1,13 +1,13 @@
 error[E0277]: the trait bound `Sneaky: tracing_wide::__private::Sealed` is not satisfied
- --> tests/ui/seal.rs:6:52
+ --> tests/ui/seal.rs:4:52
   |
-6 | impl tracing_wide::__private::MessageBehaviour for Sneaky {
+4 | impl tracing_wide::__private::MessageBehaviour for Sneaky {
   |                                                    ^^^^^^ unsatisfied trait bound
   |
 help: the trait `tracing_wide::__private::Sealed` is not implemented for `Sneaky`
- --> tests/ui/seal.rs:4:1
+ --> tests/ui/seal.rs:2:1
   |
-4 | struct Sneaky;
+2 | struct Sneaky;
   | ^^^^^^^^^^^^^
 note: required by a bound in `tracing_wide::__private::MessageBehaviour`
  --> src/lib.rs

@@ -1,13 +1,6 @@
 //! Generate a YAML manifest from the message catalogue.
 //!
 //! Run: `just example-catalogue-serde` (see `catalogue-facet` for the facet equivalent)
-//!
-//! Walks `tracing_wide::catalogue::all()` and serializes the descriptors
-//! directly — the `serde` feature implements `Serialize` on them, so no mirror
-//! structs are needed. The `message` leaf is keyed by `msg` (the same unique
-//! key emitted events join on); a sibling `tags` leaf lists the sorted union of
-//! every routing tag. A build step could redirect this into a checked-in
-//! `catalogue.yaml` — the catalogue is the schema.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -24,8 +17,6 @@ struct RequestCompleted {
 }
 
 /// Emitted when a service finishes starting up.
-///
-/// If services start up at all - we had lots of quality issues lately.
 #[message(msg = "service started", level = warn, owner = "platform", tags = ["platform", "startup"])]
 #[derive(Default)]
 struct Started {
@@ -44,8 +35,7 @@ fn main() {
         tags: BTreeSet<&'static str>,
     }
 
-    // A keyed manifest requires unique keys — a duplicate `msg` would silently
-    // drop an entry from the map below. An app would put this line in a test or a catalogue generating binary.
+    // A keyed manifest needs unique `msg` keys; an app checks this in a test or a catalogue binary.
     assert_eq!(
         tracing_wide::catalogue::duplicates(),
         Vec::<&str>::new(),

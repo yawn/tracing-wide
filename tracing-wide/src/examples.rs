@@ -1,13 +1,5 @@
 //! # Examples
 //!
-//! - [`catalogue-serde`](#catalogue-serde)
-//! - [`catalogue-facet`](#catalogue-facet)
-//! - [`instrument`](#instrument)
-//! - [`subscriber-serde`](#subscriber-serde)
-//! - [`subscriber`](#subscriber)
-//! - [`tags`](#tags)
-//! - [`subscriber-facet`](#subscriber-facet)
-//!
 //! ## `catalogue-serde`
 //!
 #![doc = "```rust,ignore"]

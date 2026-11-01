@@ -1,5 +1,5 @@
 error: #[message] does not support generic parameters (a message must be a concrete `'static` type)
- --> tests/ui/generic_params.rs:4:9
+ --> tests/ui/generic_params.rs:3:9
   |
-4 | struct M<T> {
+3 | struct M<T> {
   |         ^^^

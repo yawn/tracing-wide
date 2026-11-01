@@ -14,10 +14,7 @@ use tracing_wide::message;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_test::wasm_bindgen_test;
 
-// `Alt*`/`Dup*` deliberately collide on `msg` — only ever registered, so they
-// poison nothing but the duplicate check they exist to exercise. The `Dup*`
-// triple shares one msg (dedup: one report, not one per extra registration);
-// the `Alt*` pair shares another (multiple distinct collisions are all reported).
+// `Alt*`/`Dup*` deliberately collide on `msg`.
 #[message(msg = "also duplicated")]
 #[allow(dead_code)]
 struct AltA {
@@ -48,7 +45,7 @@ struct DupC {
     c: usize,
 }
 
-/// Predecessor of `Started`, kept to exercise message-level deprecation: the
+/// "Predecessor" of `Started`, kept to exercise message-level deprecation: the
 /// note must land in the descriptor, and the generated impls must not warn (only
 /// producer construction should).
 #[message(msg = "legacy started")]
@@ -133,7 +130,7 @@ mod catalogue_facet {
         duration: usize,
     }
 
-    /// The facet manifest must match the serde manifest field-for-field — the
+    /// The facet manifest must match the serde manifest field-for-field: the
     /// whole point of the proxies (compact origin, map meta, level name).
     #[test]
     fn descriptor_serializes_identically_under_serde_and_facet() {

@@ -19,12 +19,8 @@ Highlights include:
   subscribers, then records to `tracing` at the type's level.
 - Flexible serialization: none, `serde`, or `facet`; opt-in per type, never a
   bound on `Message`.
-- Catalogue: every message a binary can emit, auto-registered and walkable,
-  including messages defined in libraries or member crates as long as they're
-  linked in. The catalogue is representation-agnostic - it's plain data you can
-  serialize to any format (or none): a manifest (`msg` is the unique join key)
-  that non-technical stakeholders can reason about, with duplicate keys detectable
-  in a test.
+- Catalogue: every linked-in message type, auto-registered and walkable as plain
+  data; serialize it into a manifest keyed by `msg` and test it for duplicates.
 - Automatic origin: crate / module / file / line / column captured per
   message, object-safe and drift-free.
 - Ambient autocapture: `Option` fields fill at emit time from same-named

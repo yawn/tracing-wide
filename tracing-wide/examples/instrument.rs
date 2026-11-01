@@ -1,15 +1,6 @@
 //! Ambient autocapture: `tracing::instrument` as the contribution surface.
 //!
 //! Run: `just example-instrument`
-//!
-//! Stock `tracing::instrument` opens the spans (tracing-wide ships no span
-//! macro); whatever it records becomes ambient context via
-//! [`CaptureLayer`](tracing_wide::instrument::CaptureLayer). At `event!` time
-//! the still-`None` `Option` fields fill from the span scope by name, innermost
-//! first — required fields stay compile-checked at the literal, and a field
-//! already set is never overwritten. The fmt layer shows the tracing handoff;
-//! a typed subscriber parks the *same* message to verify every ambient value
-//! arrived, proving the join happens before dispatch.
 
 use std::sync::{Arc, Mutex};
 
@@ -22,9 +13,7 @@ use tracing_wide::{
 
 struct Park(Arc<Mutex<Option<WorkFinished>>>);
 
-/// `payload` is required (supplied at the `event!` literal). `component` and
-/// `attempt` are ambient: nothing in `work` knows them — they join from the
-/// spans `handle` and `work` opened above the emission point.
+/// `payload` is required; `component` and `attempt` join from the spans of `handle` and `work`.
 #[message(msg = "work finished")]
 #[derive(Clone, Default)]
 struct WorkFinished {
@@ -55,8 +44,7 @@ fn handle(attempt: usize) {
     work(attempt);
 }
 
-// `tracing::instrument` records arguments by default: `attempt` lands on this
-// span without being named.
+// `tracing::instrument` records arguments by default, so `attempt` lands on this span.
 #[instrument]
 fn work(attempt: usize) {
     event!(WorkFinished::payload(42));
@@ -71,9 +59,7 @@ fn main() {
 
     let subscriber = tracing_subscriber::registry()
         .with(tracing_wide::instrument::layer())
-        // `.without_time()`: the wall-clock timestamp is the one non-deterministic
-        // bit of this example's output, and it's documented verbatim (README +
-        // rustdoc), so drop it to keep the snapshot stable.
+        // No timestamp: the output is a checked snapshot.
         .with(tracing_subscriber::fmt::layer().without_time());
 
     tracing::subscriber::set_global_default(subscriber).expect("first subscriber");

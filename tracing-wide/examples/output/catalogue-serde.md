@@ -14,14 +14,11 @@ messages:
     level: INFO
     meta:
       owner: api
-    origin: tracing-wide tracing-wide/examples/catalogue-serde.rs:19:8
+    origin: tracing-wide tracing-wide/examples/catalogue-serde.rs:12:8
     tags:
     - api
   service started:
-    doc: |-
-      Emitted when a service finishes starting up.
-
-      If services start up at all - we had lots of quality issues lately.
+    doc: Emitted when a service finishes starting up.
     fields:
     - meta:
         unit: count
@@ -36,7 +33,7 @@ messages:
     level: WARN
     meta:
       owner: platform
-    origin: tracing-wide tracing-wide/examples/catalogue-serde.rs:31:8
+    origin: tracing-wide tracing-wide/examples/catalogue-serde.rs:22:8
     tags:
     - platform
     - startup

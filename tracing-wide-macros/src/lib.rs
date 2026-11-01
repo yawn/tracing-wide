@@ -1,10 +1,4 @@
-//! Proc macros for tracing-wide.
-//!
-//! - `event!(Foo { a, b })` — constructs a `Message`, dispatches it to registered
-//!   subscribers, then records it to tracing.
-//! - `#[message(msg = "...")]` — marks a struct as an emittable message:
-//!   implements `Message`/`MessageBehaviour`, fills the inherent consts,
-//!   generates the recording, and asserts every field type implements `Field`.
+//! Proc macros for tracing-wide: `#[message]` and `event!`. Use them through `tracing-wide`.
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
@@ -14,22 +8,13 @@ use syn::{
     MetaNameValue, Token, Type, parse::Parser, parse_macro_input, punctuated::Punctuated,
 };
 
-/// A `#[deprecated]` harvested from a `#[message]` struct or one of its
-/// fields: `None` when absent, `Some("true")` when no reason is given,
-/// otherwise the reason — `since` is not captured. rustc validates and
-/// enforces the attribute itself (producers warn natively), so harvesting is
-/// best-effort presence + reason. In tokens position it renders as the
-/// `Option<&'static str>` a descriptor's `deprecated` field expects.
+/// The `#[deprecated]` reason of a struct or field, `"true"` without one; renders as `Option<&'static str>`.
 struct Deprecation(Option<String>);
 
-/// `///` doc comments harvested from a struct or field. In tokens position it
-/// renders as the `Option<&'static str>` a descriptor's `doc` field expects.
+/// The `///` docs of a struct or field; renders as `Option<&'static str>`.
 struct Docs(Option<String>);
 
-/// One named field of a `#[message]` struct — everything the expansion needs
-/// from it: the catalogue descriptor data, the recording ident, the ambient
-/// join candidacy, and the type for the `Field` assertion. In tokens position
-/// it renders as its catalogue `FieldDescriptor` literal.
+/// One named field of a `#[message]` struct; renders as its catalogue `FieldDescriptor`.
 struct MessageField {
     deprecated: Deprecation,
     doc: Docs,
@@ -38,22 +23,16 @@ struct MessageField {
     ty: Type,
 }
 
-/// Arbitrary `key = <literal>` metadata pairs (message- or field-level). In
-/// tokens position it renders as the `&[(&str, &str)]` slice literal a
-/// descriptor's `meta` field expects.
+/// The `key = <literal>` metadata pairs; renders as `&[(&str, &str)]`.
 #[derive(Default)]
 struct MetaPairs(Vec<(String, String)>);
 
-/// The `tags = [...]` routing labels, sorted + deduped + lowercased at
-/// expansion so the emitted `&[&str]` is canonical and cheap to compare. In
-/// tokens position it renders as the slice literal `&[ "a", "b" ]`.
+/// The `tags = [...]` labels: sorted, deduped, lowercase; renders as `&[&str]`.
 #[derive(Default)]
 struct Tags(Vec<String>);
 
 impl Deprecation {
-    /// The reason from the first `#[deprecated]` attribute, if any: handles
-    /// the bare, `= "reason"`, and `(since = ..., note = ...)` forms; a form
-    /// without a reason yields `"true"`.
+    /// The reason of the first `#[deprecated]`, in its bare, `= "…"`, or `(note = "…")` form.
     fn harvest(attrs: &[Attribute]) -> Self {
         let reason = |a: &Attribute| {
             let reason = match &a.meta {
@@ -115,9 +94,7 @@ impl Docs {
 }
 
 impl MessageField {
-    /// The `T` if the field is syntactically `Option<T>` (also
-    /// `option::Option<T>` etc.) — syntactic, like every derive that
-    /// special-cases `Option`. Drives which fields the ambient join may fill.
+    /// The `T` of a field typed `Option<T>`, matched by syntax.
     fn ambient_inner(&self) -> Option<&Type> {
         let Type::Path(tp) = &self.ty else {
             return None;
@@ -150,8 +127,7 @@ impl MessageField {
     fn parse(field: &syn::Field) -> syn::Result<Self> {
         let ident = field.ident.clone().expect("named field");
 
-        // tracing's macros merge a field named `message` into the event's
-        // message text, silently losing the key.
+        // tracing merges a field named `message` into the event text, which loses the key.
         if ident == "message" {
             return Err(Error::new_spanned(
                 &ident,
@@ -184,9 +160,7 @@ impl MessageField {
 }
 
 impl MetaPairs {
-    /// Accept one `key = <literal>` pair: the key must be an identifier, the
-    /// value a literal (str/int/bool/float) — stringified, so the catalogue
-    /// stores one uniform type.
+    /// Adds one `key = <literal>` pair, with the value as a string.
     fn push(&mut self, kv: &MetaNameValue) -> syn::Result<()> {
         let Some(key) = kv.path.get_ident() else {
             return Err(Error::new_spanned(
@@ -230,9 +204,7 @@ impl MetaPairs {
 }
 
 impl Tags {
-    /// Parse `["a", "b", …]`: each element a non-empty, lowercase string
-    /// literal. Crate-prefix namespacing is deliberately *not* enforced —
-    /// `Origin` already carries the originating crate.
+    /// Parses `["a", "b"]`: non-empty, lowercase string literals.
     fn parse(value: &Expr) -> syn::Result<Self> {
         let Expr::Array(array) = value else {
             return Err(Error::new_spanned(
@@ -327,13 +299,8 @@ impl ToTokens for Tags {
     }
 }
 
-/// Function-like macro: construct a `Message` and record it.
-///
-/// `event!(Started { service, attempt })` evaluates the expression (typically a
-/// struct literal whose field shorthand pulls in locals and arguments in scope),
-/// checks it is a `Message`, and records it to the current tracing subscriber.
-/// For spans, use `tracing::instrument` — tracing-wide deliberately ships no
-/// span macro of its own.
+/// Emits a message: `event!(Started { service, attempt })` fills ambient fields, fans out to subscribers, and records
+/// to tracing.
 #[proc_macro]
 pub fn event(input: TokenStream) -> TokenStream {
     let expr = parse_macro_input!(input as Expr);
@@ -348,15 +315,12 @@ pub fn event(input: TokenStream) -> TokenStream {
     .into()
 }
 
-/// The `#[message]` expansion in `proc_macro2` terms, so it is unit-testable
-/// and its output is pretty-printable.
+/// The `#[message]` expansion on `proc_macro2` tokens, so tests can call it.
 fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenStream2> {
     let mut input: DeriveInput = syn::parse2(item)?;
     let name = input.ident.clone();
 
-    // The generated impls and the catalogue's `TypeId::of` need one concrete
-    // `'static` type; reject generics up front instead of leaking E0107s from
-    // the expansion.
+    // One concrete `'static` type for the impls and `TypeId::of`: reject generics here, not with E0107s.
     if !input.generics.params.is_empty() {
         return Err(Error::new_spanned(
             &input.generics,
@@ -425,17 +389,13 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
     }
     let msg = msg.unwrap_or_else(|| name.to_string());
 
-    // tracing's macros treat the trailing literal as a format string; escape
-    // braces so a `msg` containing `{`/`}` records verbatim instead of
-    // triggering format-argument capture (rendering un-escapes them, so the
-    // recorded text still matches `MSG`).
+    // tracing reads `msg` as a format string: escapes braces so the text records verbatim.
     let msg_record = msg.replace('{', "{{").replace('}', "}}");
 
     let msg_doc = Docs::harvest(&input.attrs);
     let msg_deprecation = Deprecation::harvest(&input.attrs);
 
-    // The deprecation warning belongs at producer construction sites; exempt
-    // the generated impls, which must keep naming the type.
+    // Producers get the deprecation warning; the generated impls must still specify the type.
     let allow_deprecated = if msg_deprecation.0.is_some() {
         quote! { #[allow(deprecated)] }
     } else {
@@ -478,8 +438,7 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
         }
     };
 
-    // `#[field(...)]` is a helper attribute the compiler doesn't know; strip it
-    // before re-emitting the struct.
+    // The compiler does not know the `#[field(...)]` helper attribute: strip it.
     if let Data::Struct(s) = &mut input.data
         && let Fields::Named(named) = &mut s.fields
     {
@@ -499,9 +458,7 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
         })
     });
 
-    // Location builtins at the struct's span resolve to the definition site,
-    // filled by rustc while compiling the defining crate (the proc-macro can't
-    // read spans on stable).
+    // Location builtins at the struct span resolve to the definition site (stable cannot read spans).
     let origin = quote_spanned! { name.span() =>
         ::tracing_wide::Origin {
             column: ::core::column!(),
@@ -517,14 +474,14 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
 
         #allow_deprecated
         impl #name {
-            /// Severity of this event type (drives the tracing macro below).
+            /// Severity of this event type.
             pub const LEVEL: ::tracing_wide::__private::tracing::Level =
                 ::tracing_wide::__private::tracing::Level::#level_const;
 
             /// Constant, static message text for this event type.
             pub const MSG: &'static str = #msg;
 
-            /// Where this event type is defined — automatic provenance.
+            /// Where this event type is defined: automatic provenance.
             pub const ORIGIN: ::tracing_wide::Origin = #origin;
 
             /// Sorted, deduped, lowercased routing tags for this event type.
@@ -567,8 +524,7 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
                 #( #ambient ),*
             }
 
-            // Deprecated fields keep recording (consumers mid-migration still
-            // read them); only the producer's construction should warn.
+            // Deprecated fields keep recording; only producer construction warns.
             #[allow(deprecated)]
             fn record(&self) {
                 ::tracing_wide::__private::tracing::#level_macro!( #( #idents = &self.#idents, )* #msg_record );
@@ -582,17 +538,11 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
     })
 }
 
-/// Attribute macro: mark a struct as a `Message`.
+/// Marks a struct as a `Message`: `#[message(msg = "...", level = warn, tags = ["a"], key = "value")]`.
 ///
-/// Implements the (pseudo-sealed) `Message`/`MessageBehaviour` traits, fills
-/// the inherent `MSG` const from `#[message(msg = "...")]` (defaulting to the
-/// struct name), generates the tracing recording, and asserts every field type
-/// is a `Field`. The point is to keep the message static and put all variance
-/// in the typed fields.
-///
-/// A struct-level `#[deprecated]` is honored like a field-level one: producers
-/// get rustc's native warning, the note lands in the catalogue descriptor, and
-/// the generated impls are exempted.
+/// `msg` defaults to the struct name, `level` to `info`. Any other `key = <literal>` is catalogue metadata, as is
+/// `#[field(key = <literal>)]` on a field. Each field type must be a `Field`. A `#[deprecated]` warns producers and
+/// goes into the catalogue.
 #[proc_macro_attribute]
 pub fn message(attr: TokenStream, item: TokenStream) -> TokenStream {
     expand_message(attr.into(), item.into())
@@ -600,8 +550,7 @@ pub fn message(attr: TokenStream, item: TokenStream) -> TokenStream {
         .into()
 }
 
-/// Render an `Option<String>` as `Option<&'static str>` tokens — the shared
-/// shape of the descriptors' `doc` and `deprecated` fields.
+/// Render an `Option<String>` as `Option<&'static str>` tokens.
 fn option_str(value: &Option<String>) -> TokenStream2 {
     match value {
         Some(s) => quote! { ::core::option::Option::Some(#s) },
@@ -656,8 +605,7 @@ mod tests {
         assert!(field.contains(r#"Some("old")"#), "{field}");
         assert!(!field.contains("#[allow(deprecated)]\nimpl"), "{field}");
 
-        // Macro-invocation contents print as raw tokens (spaced); normalize
-        // whitespace before matching.
+        // Macro contents print as spaced raw tokens: normalize whitespace first.
         let plain = pretty(quote! { struct M { a: usize } });
         let flat: String = plain.chars().filter(|c| !c.is_whitespace()).collect();
         assert!(
@@ -749,8 +697,7 @@ mod tests {
         .expect("expansion succeeds");
         let pretty = prettyplease::unparse(&syn::parse2::<syn::File>(expanded).unwrap());
 
-        // The const keeps the text verbatim; only the tracing handoff (a
-        // format string position) sees the escaped form.
+        // The const keeps the text verbatim; only the tracing handoff sees the escaped form.
         assert!(pretty.contains(r#""rate {limit} hit""#), "{pretty}");
         assert!(pretty.contains(r#""rate {{limit}} hit""#), "{pretty}");
     }

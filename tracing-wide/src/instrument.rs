@@ -1,22 +1,8 @@
-//! Ambient autocapture: fill a message's `Option` fields from the tracing span
-//! scope at emit time. Gated by the `instrument` feature.
+//! Ambient autocapture: `event!` fills still-`None` `Option` fields from the span scope (feature `instrument`).
 //!
-//! tracing-core stores no field values, so capture is a cooperating
-//! [`CaptureLayer`] that copies span field values into the registry's
-//! `Extensions`; the read half ([`crate::__private::instrument::get`]) downcasts
-//! the current dispatcher to the base `Registry` and walks the span scope
-//! innermost-first. The contract, end to end:
-//!
-//! - **Only `Option` fields join.** Required (bare-typed) fields come from the
-//!   `event!` struct literal, compile-checked; an ambient miss is legal and
-//!   leaves the field `None` (which tracing then omits from the event).
-//! - A field that is already `Some` is never overwritten — locals beat ambient.
-//! - No registry, no [`CaptureLayer`], no current span → every lookup misses.
-//!   `event!` never fails; degradation is graceful by construction.
-//! - Type fidelity is bounded by tracing's visitor: primitives and strings
-//!   round-trip; `?debug`-recorded values arrive as rendered strings (a
-//!   `String` field absorbs them). Conversion is [`FromCaptured`]; an `Option`
-//!   field whose inner type has no impl simply never fills.
+//! - Install [`layer()`] on a `tracing_subscriber::registry()` stack; without it, every lookup misses.
+//! - A field that is already `Some` keeps its value.
+//! - A `?debug` span value arrives as a string, which only a `String` field takes; see [`FromCaptured`].
 
 use tracing::{
     Subscriber,
@@ -28,14 +14,10 @@ use tracing_subscriber::{
     registry::LookupSpan,
 };
 
-/// The per-span store the capture layer puts into the registry's `Extensions`.
-/// A `Vec` (not a map): span field counts are small, and upsert keeps one entry
-/// per name. `pub(crate)` so the read half — [`crate::__private::instrument::get`]
-/// — can pull it back out of the registry.
+/// The captured fields of one span, stored in the registry `Extensions`.
 pub(crate) struct CapturedFields(pub(crate) Vec<(&'static str, CapturedValue)>);
 
-/// A span field value as the capture layer retained it. The variants mirror
-/// tracing's `Visit` callbacks.
+/// A captured span field value; the variants mirror tracing's `Visit` callbacks.
 #[derive(Clone, Debug, PartialEq)]
 pub enum CapturedValue {
     Bool(bool),
@@ -49,31 +31,24 @@ pub enum CapturedValue {
     U128(u128),
 }
 
-/// The capture half of ambient autocapture: retains every span's field values
-/// in the registry's `Extensions` so the emit-time join can read them back.
-/// Install it on a `tracing_subscriber::registry()`-based stack:
-///
-/// ```ignore
-/// use tracing_subscriber::layer::SubscriberExt;
-/// let subscriber = tracing_subscriber::registry().with(tracing_wide::instrument::layer());
-/// ```
+/// The layer that captures span field values for the ambient join; build it with [`layer()`].
 pub struct CaptureLayer {
     _private: (),
 }
 
 struct CaptureVisitor<'a>(&'a mut Vec<(&'static str, CapturedValue)>);
 
-/// Conversion from a [`CapturedValue`] into a field's inner type. Implemented
-/// for the primitives and `String`; integer conversions are lossless
-/// (`try_from`) — an out-of-range capture is a miss, not a wrap. Likewise
-/// `f32`: tracing widens every float to `f64`, so the conversion narrows only
-/// when the value round-trips exactly (true for anything recorded as `f32`;
-/// NaN passes) — a genuine `f64` that can't be represented is a miss.
+/// Converts a [`CapturedValue`] into a field type; a lossy conversion is a miss (`None`), not a wrap.
 pub trait FromCaptured: Sized {
     fn from_captured(value: &CapturedValue) -> Option<Self>;
 }
 
-/// Construct a [`CaptureLayer`] (the `fmt::layer()`-style spelling).
+/// Builds a [`CaptureLayer`]; install it on a `tracing_subscriber::registry()` stack:
+///
+/// ```ignore
+/// use tracing_subscriber::layer::SubscriberExt;
+/// let subscriber = tracing_subscriber::registry().with(tracing_wide::instrument::layer());
+/// ```
 pub fn layer() -> CaptureLayer {
     CaptureLayer { _private: () }
 }

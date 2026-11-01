@@ -1,5 +1,4 @@
-// Generic parameters are rejected up front: the generated impls and the
-// catalogue's `TypeId::of` need one concrete `'static` type.
+// A message must be one concrete `'static` type, so `#[message]` rejects generics.
 #[tracing_wide::message(msg = "x")]
 struct M<T> {
     a: T,

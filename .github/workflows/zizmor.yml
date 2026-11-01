@@ -30,7 +30,7 @@ jobs:
       - name: Run zizmor
         uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa # v0.5.7
         with:
-          # Strictest persona — enables auditor-only audits, notably
+          # Strictest persona: enables auditor-only audits, notably
           # ref-version-mismatch, which warns when a pinned SHA drifts from
           # its `# vN` comment.
           persona: auditor
