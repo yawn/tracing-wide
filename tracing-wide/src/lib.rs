@@ -13,6 +13,7 @@ use core::any::Any;
 use core::fmt;
 
 pub use meta::Meta;
+pub use tags::Tags;
 pub use tracing_wide_macros::{event, message};
 
 #[cfg(doc)]
@@ -31,6 +32,7 @@ pub mod instrument;
 mod meta;
 #[cfg(feature = "sink")]
 pub mod sink;
+mod tags;
 
 /// Marker for a type that can be a message field; implemented for every `tracing::field::Value`.
 pub trait Field: tracing::field::Value {}
@@ -67,10 +69,8 @@ pub trait Message: __private::MessageBehaviour {
     /// Where the message type is defined; see [`Origin`].
     fn origin(&self) -> &'static Origin;
 
-    /// The routing tags of `#[message(tags = [...])]`: sorted, deduped, lowercase; empty by default.
-    fn tags(&self) -> &'static [&'static str] {
-        &[]
-    }
+    /// The routing tags of `#[message(tags = [...])]`; empty when none are given.
+    fn tags(&self) -> Tags;
 }
 
 /// Where a message type is defined, captured by `#[message]` at compile time.
@@ -121,6 +121,22 @@ impl TryFrom<String> for Origin {
 }
 
 impl<T: tracing::field::Value> Field for T {}
+
+/// Whether `a` sorts strictly before `b`, by bytes like `str`'s `Ord`.
+const fn precedes(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    let mut i = 0;
+
+    while i < a.len() && i < b.len() {
+        if a[i] != b[i] {
+            return a[i] < b[i];
+        }
+
+        i += 1;
+    }
+
+    a.len() < b.len()
+}
 
 /// `#[message]`-internal: registers a catalogue descriptor if the `catalogue` feature is on.
 #[cfg(feature = "catalogue")]

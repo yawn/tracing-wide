@@ -29,7 +29,7 @@ struct MessageField {
 #[derive(Default)]
 struct MetaAttr(BTreeMap<String, String>);
 
-/// The `tags = [...]` labels: sorted, deduped, lowercase; renders as `&[&str]`.
+/// The tags of `tags = [...]`: sorted, deduped, lowercase; renders as `Tags`.
 #[derive(Default)]
 struct TagsAttr(Vec<String>);
 
@@ -297,7 +297,7 @@ impl ToTokens for TagsAttr {
     fn to_tokens(&self, tokens: &mut TokenStream2) {
         let tags = self.0.iter();
 
-        tokens.extend(quote! { &[ #( #tags ),* ] });
+        tokens.extend(quote! { ::tracing_wide::Tags::__new(&[ #( #tags ),* ]) });
     }
 }
 
@@ -447,7 +447,7 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
             pub const LEVEL: ::tracing_wide::__private::tracing::Level =
                 ::tracing_wide::__private::tracing::Level::#level_const;
 
-            /// Metadata pairs for this event type, sorted by key.
+            /// Metadata of this event type.
             pub const META: ::tracing_wide::Meta = #msg_meta;
 
             /// Constant, static message text for this event type.
@@ -456,8 +456,8 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
             /// Where this event type is defined: automatic provenance.
             pub const ORIGIN: ::tracing_wide::Origin = #origin;
 
-            /// Sorted, deduped, lowercased routing tags for this event type.
-            pub const TAGS: &'static [&'static str] = #tags;
+            /// Routing tags of this event type.
+            pub const TAGS: ::tracing_wide::Tags = #tags;
         }
 
         #allow_deprecated
@@ -470,7 +470,7 @@ fn expand_message(attr: TokenStream2, item: TokenStream2) -> syn::Result<TokenSt
             fn meta(&self) -> ::tracing_wide::Meta { Self::META }
             fn msg(&self) -> &'static str { Self::MSG }
             fn origin(&self) -> &'static ::tracing_wide::Origin { &Self::ORIGIN }
-            fn tags(&self) -> &'static [&'static str] { Self::TAGS }
+            fn tags(&self) -> ::tracing_wide::Tags { Self::TAGS }
         }
 
         #[doc(hidden)]
@@ -816,14 +816,20 @@ mod tests {
 
     #[test]
     fn message_sorts_and_dedups_tags() {
-        let pretty = expand_parse_unparse(
-            quote! { msg = "m", tags = ["b", "a", "a"] },
-            quote! { struct M { x: usize } },
-        );
-        assert!(pretty.contains("pub const TAGS"));
+        let pretty = |attr| expand_parse_unparse(attr, quote! { struct M { x: usize } });
+
+        let tags = pretty(quote! { msg = "m", tags = ["b", "a", "a"] });
         assert!(
-            pretty.contains(r#"["a", "b"]"#),
-            "tags sorted+deduped: {pretty}"
+            tags.contains("    pub const TAGS: ::tracing_wide::Tags = ::tracing_wide::Tags::__new(&[\"a\", \"b\"]);\n"),
+            "{tags}"
+        );
+
+        let bare = pretty(quote! { msg = "m" });
+        assert!(
+            bare.contains(
+                "    pub const TAGS: ::tracing_wide::Tags = ::tracing_wide::Tags::__new(&[]);\n"
+            ),
+            "{bare}"
         );
     }
 

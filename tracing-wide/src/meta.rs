@@ -5,6 +5,8 @@ use core::slice;
 #[cfg(feature = "facet")]
 use std::collections::BTreeMap;
 
+use crate::precedes;
+
 /// Static `key = <literal>` metadata of a message type or a field: values stringified, sorted by key, each key once.
 #[derive(Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "facet", derive(::facet::Facet))]
@@ -15,22 +17,6 @@ impl Meta {
     /// `#[message]`-internal: wraps pairs whose keys are sorted and unique, else panics (a compile error in a `const`).
     #[doc(hidden)]
     pub const fn __new(pairs: &'static [(&'static str, &'static str)]) -> Self {
-        /// Whether `a` sorts strictly before `b`, by bytes like `str`'s `Ord`.
-        const fn precedes(a: &str, b: &str) -> bool {
-            let (a, b) = (a.as_bytes(), b.as_bytes());
-            let mut i = 0;
-
-            while i < a.len() && i < b.len() {
-                if a[i] != b[i] {
-                    return a[i] < b[i];
-                }
-
-                i += 1;
-            }
-
-            a.len() < b.len()
-        }
-
         let mut i = 1;
 
         while i < pairs.len() {

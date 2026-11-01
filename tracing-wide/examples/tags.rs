@@ -34,7 +34,7 @@ struct PaymentCaptured {
 
 impl Sink for Analytics {
     fn on_message(&self, m: &dyn Message) {
-        if m.tags().contains(&"analytics") {
+        if m.tags().contains("analytics") {
             println!("[analytics] forward {:?}  ({})", m.msg(), m.origin());
         }
     }
@@ -42,7 +42,7 @@ impl Sink for Analytics {
 
 impl Sink for Database {
     fn on_message(&self, m: &dyn Message) {
-        if m.tags().contains(&"persist") {
+        if m.tags().contains("persist") {
             println!("[db]        store   {:?}  ({})", m.msg(), m.origin());
         }
     }

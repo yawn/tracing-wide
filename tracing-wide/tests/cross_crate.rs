@@ -49,7 +49,7 @@ mod routing {
             self.0
                 .lock()
                 .unwrap()
-                .push((m.origin().krate, m.msg(), m.tags().to_vec()));
+                .push((m.origin().krate, m.msg(), m.tags().iter().collect()));
         }
     }
 
@@ -188,7 +188,7 @@ fn catalogue_registers_descriptors_from_both_crates() {
     let granted = find("access granted");
 
     assert_eq!(granted.origin.krate, "integration-test-crate");
-    assert_eq!(granted.tags.to_vec(), ["security"]);
+    assert_eq!(granted.tags.iter().collect::<Vec<_>>(), ["security"]);
 
     assert!(
         granted.origin.file.ends_with("lib.rs"),
@@ -205,5 +205,5 @@ fn catalogue_registers_descriptors_from_both_crates() {
     let order = find("order placed");
 
     assert_eq!(order.origin.krate, "tracing-wide");
-    assert_eq!(order.tags.to_vec(), ["persist"]);
+    assert_eq!(order.tags.iter().collect::<Vec<_>>(), ["persist"]);
 }

@@ -57,7 +57,7 @@ fn main() {
             .collect();
 
     let tags: BTreeSet<&'static str> = tracing_wide::catalogue::all()
-        .flat_map(|d| d.tags.iter().copied())
+        .flat_map(|d| d.tags.iter())
         .collect();
 
     let manifest =

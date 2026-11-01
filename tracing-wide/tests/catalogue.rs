@@ -98,7 +98,7 @@ fn catalogue_registers_message_descriptors() {
     assert_eq!(d.deprecated, None);
     assert_eq!(d.meta.get("owner"), Some("platform"));
     assert!(d.meta.iter().eq(common::Started::META));
-    assert_eq!(d.tags.to_vec(), ["platform", "startup"]);
+    assert_eq!(d.tags.iter().collect::<Vec<_>>(), ["platform", "startup"]);
     assert_eq!(d.origin.krate, "tracing-wide");
     assert!(d.origin.file.ends_with("common.rs"));
 

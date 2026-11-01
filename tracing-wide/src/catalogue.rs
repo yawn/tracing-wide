@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use tracing::Level;
 
-use crate::{Meta, Origin};
+use crate::{Meta, Origin, Tags};
 
 /// One field's catalogue metadata.
 #[derive(Debug)]
@@ -76,10 +76,10 @@ pub struct MessageDescriptor {
     /// Where the type is defined; serialized as its `Display` string.
     #[cfg_attr(feature = "serde", serde(serialize_with = "serde::origin"))]
     pub origin: Origin,
-    /// Routing tags: sorted, deduped, lowercase; not serialized when empty.
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "tags_empty"))]
-    #[cfg_attr(feature = "facet", facet(skip_serializing_if = tags_empty))]
-    pub tags: &'static [&'static str],
+    /// Routing tags; not serialized when empty.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Tags::is_empty"))]
+    #[cfg_attr(feature = "facet", facet(skip_serializing_if = Tags::is_empty))]
+    pub tags: Tags,
     /// Joins a live message by `m.as_any().type_id()`; build-local, so not serialized.
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "facet", facet(skip))]
@@ -116,12 +116,6 @@ impl From<LevelName> for Level {
             LevelName::ERROR => Level::ERROR,
         }
     }
-}
-
-/// Omit-when-empty predicate for serde and facet.
-#[cfg(any(feature = "serde", feature = "facet"))]
-fn tags_empty(tags: &&'static [&'static str]) -> bool {
-    tags.is_empty()
 }
 
 /// Serde shims; the name shadows the `serde` crate, so the derives write `::serde`.

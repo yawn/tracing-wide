@@ -30,6 +30,9 @@ Pre-1.0, a breaking change bumps the minor version.
   `tracing::Subscriber`. The module, the cargo feature and the examples follow:
   `subscriber` is now `sink`, `subscriber-facet` is `sink-facet`, and
   `subscriber-serde` is `sink-serde`.
+- **Breaking:** `Message::tags()`, the `TAGS` inherent const, and `MessageDescriptor::tags`
+  are a `Tags` instead of a `&'static [&'static str]`. Check a tag with
+  `tags.contains("x")` and list them with `tags.iter()`.
 - **Breaking:** `FieldDescriptor::meta` and `MessageDescriptor::meta` are a `Meta`
   instead of a `&'static [(&'static str, &'static str)]`. Read a value with
   `meta.get(key)` and every pair with `meta.iter()`.

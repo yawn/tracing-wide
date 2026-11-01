@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use common::{Charged, KvGrab, Renamed, Started};
 use seq_macro::seq;
 use tracing::Level;
-use tracing_wide::{Message, Meta, event, message};
+use tracing_wide::{Message, Meta, Tags, event, message};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -154,7 +154,10 @@ fn consts_reflect_message_attributes() {
     assert_eq!(Started::META.get("owner"), Some("platform"));
     assert_eq!(Started::MSG, "service started");
     assert_eq!(Started::ORIGIN.krate, "tracing-wide");
-    assert_eq!(Started::TAGS.to_vec(), ["platform", "startup"]);
+    assert_eq!(
+        Started::TAGS.iter().collect::<Vec<_>>(),
+        ["platform", "startup"]
+    );
 
     assert!(Plain::META.is_empty());
     assert_eq!(Plain::LEVEL, Level::INFO);
@@ -177,7 +180,10 @@ fn dyn_message_exposes_accessors_and_downcast() {
     assert_eq!(dynamic.meta().get("owner"), Some("platform"));
     assert_eq!(dynamic.msg(), "service started");
     assert_eq!(dynamic.origin().krate, "tracing-wide");
-    assert_eq!(dynamic.tags().to_vec(), ["platform", "startup"]);
+    assert_eq!(
+        dynamic.tags().iter().collect::<Vec<_>>(),
+        ["platform", "startup"]
+    );
 
     let back = dynamic
         .as_any()
@@ -362,4 +368,25 @@ fn meta_of_a_message_without_pairs_is_empty() {
     let plain: &dyn Message = &Plain::default();
 
     assert!(plain.meta().is_empty());
+}
+
+/// `Tags` finds a tag, lists its tags, and reports when it has none.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn tags_find_and_list_their_tags() {
+    let tags = Tags::__new(&["platform", "startup"]);
+
+    assert!(!tags.contains("billing"));
+    assert!(!tags.is_empty());
+    assert!(tags.contains("platform"));
+    assert_eq!(tags.iter().collect::<Vec<_>>(), ["platform", "startup"]);
+}
+
+/// A message that declares no tags returns an empty `Tags` through `&dyn Message`.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn tags_of_a_message_without_tags_are_empty() {
+    let plain: &dyn Message = &Plain::default();
+
+    assert!(plain.tags().is_empty());
 }
