@@ -1,0 +1,12 @@
+# Keeps the hash pins of every `uses:` current, with their version comments.
+# zizmor's auditor persona fails when a pinned SHA drifts from its moving tag
+# (e.g. dtolnay/rust-toolchain `v1`); these PRs move the pin back in line.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Let a new release age before we pin it.
+    cooldown:
+      default-days: 7
