@@ -24,7 +24,8 @@ docs = ["dep:document-features"]
 
 ## The catalogue of every message type; with `serde`, its descriptors are `Serialize`.
 ##
-## Enable it only where the catalogue is read, such as an xtask, a dedicated bin, or a test; never in a library.
+## Enable it where an application reads the catalogue: tests, lookups, or manifest generation in an xtask or a bin;
+## never in a library.
 catalogue = ["dep:inventory", "std"]
 
 ## `Message::as_facet`: a `facet::Peek` over a live message whose type derives `Facet`, to read fields by name.

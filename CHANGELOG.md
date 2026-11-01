@@ -37,6 +37,10 @@ Pre-1.0, a breaking change bumps the minor version.
   through to arbitrary metadata, so `#[message(id = "x")]` produced a
   `("id", "x")` entry in `descriptor.meta` and in the manifest; that entry is
   gone, and a non-string `id` value is now a compile error.
+- The `catalogue` feature's docs no longer say it should never be enabled by an
+  application. Applications legitimately enable it for catalogue tests
+  (`catalogue::duplicates()`), lookups, and manifest generation; libraries still
+  should not.
 - **Breaking:** `msg` must be non-empty and free of leading or trailing
   whitespace, the same two rules as `id`. `msg` is the fallback `id`, so the
   default path could otherwise produce the empty join key `id` rejects.
