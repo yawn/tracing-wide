@@ -3,3 +3,9 @@ error: duplicate metadata key `owner`
   |
 2 | #[tracing_wide::message(msg = "x", owner = "a", owner = "b")]
   |                                                 ^^^^^
+
+error: duplicate metadata key `unit`
+ --> tests/ui/meta_duplicate_key.rs:9:26
+  |
+9 |     #[field(unit = "ms", unit = "s")]
+  |                          ^^^^

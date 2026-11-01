@@ -3,3 +3,15 @@ error: #[message] does not support generic parameters (a message must be a concr
   |
 3 | struct M<T> {
   |         ^^^
+
+error: #[message] does not support generic parameters (a message must be a concrete `'static` type)
+ --> tests/ui/generic_params.rs:8:9
+  |
+8 | struct L<'a> {
+  |         ^^^^
+
+error: #[message] does not support generic parameters (a message must be a concrete `'static` type)
+  --> tests/ui/generic_params.rs:13:9
+   |
+13 | struct C<const N: usize> {
+   |         ^^^^^^^^^^^^^^^^

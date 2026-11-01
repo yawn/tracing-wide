@@ -696,79 +696,6 @@ mod tests {
     }
 
     #[test]
-    fn message_rejects_non_literal_meta() {
-        let err = expand_message(
-            quote! { owner = some_path },
-            quote! { struct M { a: usize } },
-        )
-        .unwrap_err();
-        assert!(err.to_string().contains("must be literals"));
-    }
-
-    #[test]
-    fn message_rejects_bare_flag() {
-        let err =
-            expand_message(quote! { serialize }, quote! { struct M { a: usize } }).unwrap_err();
-        assert!(err.to_string().contains("takes no bare flags"));
-    }
-
-    #[test]
-    fn message_rejects_non_struct() {
-        let err = expand_message(quote! {}, quote! { enum E { A } }).unwrap_err();
-        assert!(err.to_string().contains("can only be applied to structs"));
-    }
-
-    #[test]
-    fn message_rejects_unnamed_fields() {
-        let err = expand_message(quote! {}, quote! { struct T(usize); }).unwrap_err();
-        assert!(err.to_string().contains("requires named fields"));
-    }
-
-    #[test]
-    fn message_rejects_meta_list() {
-        let err =
-            expand_message(quote! { owner(x) }, quote! { struct M { a: usize } }).unwrap_err();
-        assert!(err.to_string().contains("not a list"));
-    }
-
-    #[test]
-    fn message_rejects_duplicate_meta_key() {
-        let err = expand_message(
-            quote! { owner = "a", owner = "b" },
-            quote! { struct M { a: usize } },
-        )
-        .unwrap_err();
-        assert!(err.to_string().contains("duplicate metadata key `owner`"));
-
-        let err = expand_message(
-            quote! {},
-            quote! { struct M { #[field(unit = "ms", unit = "s")] a: usize } },
-        )
-        .unwrap_err();
-        assert!(err.to_string().contains("duplicate metadata key `unit`"));
-    }
-
-    #[test]
-    fn message_rejects_field_named_message() {
-        let err = expand_message(quote! {}, quote! { struct M { message: usize } }).unwrap_err();
-        assert!(err.to_string().contains("must not be named `message`"));
-    }
-
-    #[test]
-    fn message_rejects_generic_params() {
-        let cases = [
-            quote! { struct M<T> { a: T } },
-            quote! { struct M<'a> { a: &'a str } },
-            quote! { struct M<const N: usize> { a: usize } },
-        ];
-
-        for item in cases {
-            let err = expand_message(quote! {}, item).unwrap_err();
-            assert!(err.to_string().contains("generic parameters"));
-        }
-    }
-
-    #[test]
     fn message_escapes_braces_in_recorded_msg() {
         let pretty = expand_parse_unparse(
             quote! { msg = "rate {limit} hit" },
@@ -778,59 +705,6 @@ mod tests {
         // The const keeps the text verbatim; only the tracing handoff sees the escaped form.
         assert!(pretty.contains(r#""rate {limit} hit""#), "{pretty}");
         assert!(pretty.contains(r#""rate {{limit}} hit""#), "{pretty}");
-    }
-
-    #[test]
-    fn message_rejects_non_ident_meta_key() {
-        let err =
-            expand_message(quote! { foo::bar = 1 }, quote! { struct M { a: usize } }).unwrap_err();
-        assert!(err.to_string().contains("must be identifiers"));
-    }
-
-    #[test]
-    fn message_rejects_non_string_msg() {
-        let err = expand_message(quote! { msg = 5 }, quote! { struct M { a: usize } }).unwrap_err();
-        assert!(err.to_string().contains("must be a string literal"));
-    }
-
-    #[test]
-    fn message_rejects_empty_msg() {
-        let err =
-            expand_message(quote! { msg = "" }, quote! { struct M { a: usize } }).unwrap_err();
-        assert!(err.to_string().contains("must not be empty"));
-    }
-
-    #[test]
-    fn message_rejects_untrimmed_msg() {
-        let err =
-            expand_message(quote! { msg = " x " }, quote! { struct M { a: usize } }).unwrap_err();
-        assert!(err.to_string().contains("whitespace"));
-    }
-
-    #[test]
-    fn message_rejects_non_string_id() {
-        let err = expand_message(quote! { id = 5 }, quote! { struct M { a: usize } }).unwrap_err();
-        assert!(err.to_string().contains("string literal"));
-    }
-
-    #[test]
-    fn message_rejects_empty_id() {
-        let err = expand_message(quote! { id = "" }, quote! { struct M { a: usize } }).unwrap_err();
-        assert!(err.to_string().contains("must not be empty"));
-    }
-
-    #[test]
-    fn message_rejects_untrimmed_id() {
-        let err =
-            expand_message(quote! { id = " x " }, quote! { struct M { a: usize } }).unwrap_err();
-        assert!(err.to_string().contains("whitespace"));
-    }
-
-    #[test]
-    fn message_rejects_unknown_level() {
-        let err =
-            expand_message(quote! { level = bogus }, quote! { struct M { a: usize } }).unwrap_err();
-        assert!(err.to_string().contains("unknown level"));
     }
 
     #[test]
@@ -881,49 +755,6 @@ mod tests {
         assert!(pretty.contains("pub const ORIGIN"));
         assert!(pretty.contains("CARGO_PKG_NAME"));
         assert!(pretty.contains("pub const TAGS"));
-    }
-
-    #[test]
-    fn message_rejects_non_lowercase_tag() {
-        let err = expand_message(
-            quote! { tags = ["Security"] },
-            quote! { struct M { a: usize } },
-        )
-        .unwrap_err();
-        let msg = err.to_string();
-        assert!(msg.contains("lowercase"), "{msg}");
-        assert!(msg.contains("security"), "{msg}");
-    }
-
-    #[test]
-    fn message_rejects_empty_tag() {
-        let err =
-            expand_message(quote! { tags = [""] }, quote! { struct M { a: usize } }).unwrap_err();
-        assert!(err.to_string().contains("must not be empty"));
-    }
-
-    #[test]
-    fn message_rejects_untrimmed_tag() {
-        let err = expand_message(quote! { tags = [" a "] }, quote! { struct M { a: usize } })
-            .unwrap_err();
-        assert!(err.to_string().contains("whitespace"));
-    }
-
-    #[test]
-    fn message_rejects_non_string_tag() {
-        let err =
-            expand_message(quote! { tags = [1] }, quote! { struct M { a: usize } }).unwrap_err();
-        assert!(err.to_string().contains("string literal"));
-    }
-
-    #[test]
-    fn message_rejects_non_array_tags() {
-        let err = expand_message(
-            quote! { tags = "security" },
-            quote! { struct M { a: usize } },
-        )
-        .unwrap_err();
-        assert!(err.to_string().contains("array of string literals"));
     }
 
     proptest! {
