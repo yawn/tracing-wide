@@ -128,7 +128,7 @@ mod very_wide {
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn catalogue_registers_descriptors_from_both_crates() {
-    use tracing_wide::catalogue;
+    use common::descriptor;
 
     // Force linking of the foreign crate: taking its fn pointers pulls in its
     // inventory registrations even in feature combos where no other (gated)
@@ -136,13 +136,7 @@ fn catalogue_registers_descriptors_from_both_crates() {
     let _link: [fn(&'static str); 2] =
         [integration_test_crate::grant, integration_test_crate::write];
 
-    let find = |msg: &str| {
-        catalogue::all()
-            .find(|d| d.msg == msg)
-            .unwrap_or_else(|| panic!("no catalogue entry for {msg:?}"))
-    };
-
-    let granted = find("access granted");
+    let granted = descriptor("access granted");
 
     assert_eq!(granted.origin.krate, "integration-test-crate");
     assert_eq!(granted.tags.iter().collect::<Vec<_>>(), ["security"]);
@@ -159,7 +153,7 @@ fn catalogue_registers_descriptors_from_both_crates() {
         granted.origin.module
     );
 
-    let order = find("order placed");
+    let order = descriptor("order placed");
 
     assert_eq!(order.origin.krate, "tracing-wide");
     assert_eq!(order.tags.iter().collect::<Vec<_>>(), ["persist"]);

@@ -8,6 +8,7 @@
 
 mod common;
 
+use common::descriptor;
 use tracing::Level;
 use tracing_wide::message;
 
@@ -79,12 +80,6 @@ struct SharedMsgB {
 #[allow(dead_code)]
 struct LegacyStarted {
     n: usize,
-}
-
-fn descriptor(msg: &str) -> &'static tracing_wide::catalogue::MessageDescriptor {
-    tracing_wide::catalogue::all()
-        .find(|d| d.msg == msg)
-        .unwrap_or_else(|| panic!("no catalogue entry for {msg:?}"))
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), test)]

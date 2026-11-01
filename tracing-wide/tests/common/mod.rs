@@ -9,6 +9,8 @@ use tracing::field::{Field, Visit};
 use tracing::{Event, Subscriber, subscriber};
 use tracing_subscriber::layer::{Context, Layer, SubscriberExt};
 use tracing_subscriber::registry;
+#[cfg(feature = "catalogue")]
+use tracing_wide::catalogue::{self, MessageDescriptor};
 use tracing_wide::message;
 
 /// Explicit id that is deliberately not its `msg`.
@@ -86,4 +88,12 @@ impl Visit for KvGrab {
         self.0
             .push((field.name().to_string(), format!("{value:?}")));
     }
+}
+
+/// The catalogue entry whose `msg` is `msg`; panics when there is none.
+#[cfg(feature = "catalogue")]
+pub fn descriptor(msg: &str) -> &'static MessageDescriptor {
+    catalogue::all()
+        .find(|d| d.msg == msg)
+        .unwrap_or_else(|| panic!("no catalogue entry for {msg:?}"))
 }
