@@ -78,7 +78,7 @@ seq!(N in 0..117 {
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn consts_reflect_message_attributes() {
-    assert!(Started::ORIGIN.file.ends_with("common.rs"));
+    assert!(Started::ORIGIN.file.ends_with("common/mod.rs"));
     assert_eq!(Started::LEVEL, Level::WARN);
     assert_eq!(Started::META.get("owner"), Some("platform"));
     assert_eq!(Started::MSG, "service started");

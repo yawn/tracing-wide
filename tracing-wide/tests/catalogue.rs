@@ -100,7 +100,7 @@ fn catalogue_registers_message_descriptors() {
     assert!(d.meta.iter().eq(common::Started::META));
     assert_eq!(d.tags.iter().collect::<Vec<_>>(), ["platform", "startup"]);
     assert_eq!(d.origin.krate, "tracing-wide");
-    assert!(d.origin.file.ends_with("common.rs"));
+    assert!(d.origin.file.ends_with("common/mod.rs"));
 
     let names: Vec<&str> = d.fields.iter().map(|f| f.name).collect();
 
