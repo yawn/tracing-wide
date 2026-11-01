@@ -139,7 +139,7 @@ pub fn all() -> impl Iterator<Item = &'static MessageDescriptor> {
 /// The resolved ids that more than one message type claims, each with its descriptors; must be empty. Check it in an
 /// application test:
 ///
-/// ```ignore
+/// ```
 /// let dupes = tracing_wide::catalogue::duplicates();
 /// assert!(dupes.is_empty(), "{dupes:#?}");
 /// ```

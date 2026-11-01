@@ -45,7 +45,7 @@ pub trait FromCaptured: Sized {
 
 /// Builds a [`CaptureLayer`]; install it on a `tracing_subscriber::registry()` stack:
 ///
-/// ```ignore
+/// ```
 /// use tracing_subscriber::layer::SubscriberExt;
 /// let subscriber = tracing_subscriber::registry().with(tracing_wide::instrument::layer());
 /// ```
