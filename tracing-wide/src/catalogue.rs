@@ -124,13 +124,6 @@ impl FieldDescriptor {
     }
 }
 
-impl MessageDescriptor {
-    /// The explicit [`id`](Self::id), else [`msg`](Self::msg): the value of [`Message::id`](crate::Message::id).
-    pub fn resolved_id(&self) -> &'static str {
-        self.id.unwrap_or(self.msg)
-    }
-}
-
 impl LevelName {
     /// The canonical name, e.g. `"WARN"`.
     pub const fn as_str(&self) -> &'static str {
@@ -141,6 +134,13 @@ impl LevelName {
             LevelName::WARN => "WARN",
             LevelName::ERROR => "ERROR",
         }
+    }
+}
+
+impl MessageDescriptor {
+    /// The explicit [`id`](Self::id), else [`msg`](Self::msg): the value of [`Message::id`](crate::Message::id).
+    pub fn resolved_id(&self) -> &'static str {
+        self.id.unwrap_or(self.msg)
     }
 }
 
