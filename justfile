@@ -1,5 +1,5 @@
 HACK := "cargo hack --feature-powerset --exclude-features default,docs,std -p tracing-wide"
-TESTS := "--lib --test core --test sink --test catalogue --test instrument --test serde --test facet --test cross_crate"
+TESTS := "--lib --test core --test sink --test catalogue --test snapshot --test instrument --test serde --test facet --test cross_crate"
 
 check: check-native check-wasm
 

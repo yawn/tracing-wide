@@ -2,11 +2,15 @@
 
 use core::any::TypeId;
 use core::fmt;
+use core::iter;
 use std::collections::BTreeMap;
 
 use tracing::Level;
 
 use crate::{Meta, Origin, Tags};
+
+/// Descriptors by the resolved id they share: the result of [`duplicates`].
+pub type Duplicates = BTreeMap<&'static str, Vec<&'static MessageDescriptor>>;
 
 /// One field's catalogue metadata.
 #[derive(Debug)]
@@ -220,8 +224,8 @@ pub fn all() -> impl Iterator<Item = &'static MessageDescriptor> {
 /// ```
 ///
 /// The map is ordered by id, and each list by definition site.
-pub fn duplicates() -> BTreeMap<&'static str, Vec<&'static MessageDescriptor>> {
-    let mut by_id: BTreeMap<&'static str, Vec<&'static MessageDescriptor>> = BTreeMap::new();
+pub fn duplicates() -> Duplicates {
+    let mut by_id = Duplicates::new();
     for descriptor in all() {
         by_id
             .entry(descriptor.resolved_id())
@@ -238,6 +242,89 @@ pub fn duplicates() -> BTreeMap<&'static str, Vec<&'static MessageDescriptor>> {
     }
 
     by_id
+}
+
+/// The catalogue as text to commit and diff in CI: a `tracing-wide catalogue <major>.<minor>` line (e.g. `0.3`), then
+/// one block per message, by id, after a blank line. A block has one `"<id>" message <fact>` or
+/// `"<id>" field "<name>" <fact>` line per fact (all tags on one line), sorted by bytes; each value but the level is
+/// quoted and escaped as by `{:?}`. `Err` holds the [`duplicates`]. Write it from an application test, and let CI run
+/// `git diff --exit-code catalogue.txt`:
+///
+/// ```no_run
+/// #[test]
+/// fn catalogue() {
+///     let snapshot = tracing_wide::catalogue::snapshot().unwrap_or_else(|dupes| panic!("{dupes:#?}"));
+///     std::fs::write("catalogue.txt", snapshot).unwrap();
+/// }
+/// ```
+pub fn snapshot() -> Result<String, Duplicates> {
+    // TODO: docs from `#[doc = include_str!(..)]` or `cfg_attr(.., doc = ..)`, and `#[deprecated(since = ..)]`, never
+    // reach the descriptor, so the snapshot misses them.
+    let dupes = duplicates();
+
+    if !dupes.is_empty() {
+        return Err(dupes);
+    }
+
+    let mut messages: Vec<&MessageDescriptor> = all().collect();
+
+    messages.sort_unstable_by_key(|m| m.resolved_id());
+
+    let blocks = messages.into_iter().map(|message| {
+        let id = message.resolved_id();
+        let tags: Vec<String> = message.tags.iter().map(|t| format!("{t:?}")).collect();
+        let mut facts = vec![
+            format!("level {}", message.level.as_str()),
+            format!("msg {:?}", message.msg),
+        ];
+
+        facts.extend((!tags.is_empty()).then(|| format!("tags {}", tags.join(" "))));
+
+        let prefixes = iter::once((
+            "message".to_owned(),
+            message.deprecated,
+            message.doc,
+            message.meta,
+            facts,
+        ))
+        .chain(message.fields.iter().map(|f| {
+            (
+                format!("field {:?}", f.name),
+                f.deprecated,
+                f.doc,
+                f.meta,
+                vec![format!("type {:?}", f.type_name())],
+            )
+        }));
+
+        let mut lines: Vec<String> = prefixes
+            .flat_map(|(prefix, deprecated, doc, meta, facts)| {
+                deprecated
+                    .map(|reason| format!("deprecated {reason:?}"))
+                    .into_iter()
+                    .chain(doc.map(|d| format!("doc {d:?}")))
+                    .chain(meta.iter().map(|(k, v)| format!("meta {k:?} {v:?}")))
+                    .chain(facts)
+                    .map(move |fact| format!("{id:?} {prefix} {fact}"))
+            })
+            .collect();
+
+        lines.sort_unstable();
+        lines.join("\n")
+    });
+
+    let header = concat!(
+        "tracing-wide catalogue ",
+        env!("CARGO_PKG_VERSION_MAJOR"),
+        ".",
+        env!("CARGO_PKG_VERSION_MINOR")
+    );
+
+    Ok(iter::once(header.to_owned())
+        .chain(blocks)
+        .collect::<Vec<_>>()
+        .join("\n\n")
+        + "\n")
 }
 
 inventory::collect!(MessageDescriptor);

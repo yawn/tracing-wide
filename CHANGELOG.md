@@ -8,6 +8,16 @@ Pre-1.0, a breaking change bumps the minor version.
 
 ## [Unreleased]
 
+### Added
+
+- `catalogue::snapshot()`: the catalogue as sorted text, one fact per line and
+  one block per message, for an application to commit and diff in CI
+  (`git diff --exit-code`). A change to an id, a level, a `msg`, a tag, a meta
+  pair, a doc, a deprecation, a field or a field type changes the text; field
+  order and `origin` do not.
+- `catalogue::Duplicates`, the type of `duplicates()` and of the `Err` of
+  `snapshot()`.
+
 ### Changed
 
 - **Breaking:** `FieldDescriptor::r#type` is replaced by
