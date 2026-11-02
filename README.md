@@ -49,6 +49,7 @@ event!(Hello { who: "world" });
 
 - [`catalogue-facet`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/catalogue_facet/index.html): dump the catalogue as YAML via `facet-yaml`
 - [`catalogue-serde`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/catalogue_serde/index.html): dump the catalogue as YAML via `serde`
+- [`catalogue-snapshot`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/catalogue_snapshot/index.html): print the catalogue snapshot to commit and diff in CI
 - [`instrument`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/instrument/index.html): fill `Option` fields from surrounding spans
 - [`metrics`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/metrics/index.html): derive OpenTelemetry metrics from messages in a sink
 - [`sink-facet`](https://docs.rs/tracing-wide/latest/tracing_wide/examples/sink_facet/index.html): filter on a live field value via `as_facet`

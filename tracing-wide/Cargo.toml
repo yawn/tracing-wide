@@ -91,6 +91,10 @@ name = "catalogue-serde"
 required-features = ["catalogue", "serde"]
 
 [[example]]
+name = "catalogue-snapshot"
+required-features = ["catalogue"]
+
+[[example]]
 name = "instrument"
 required-features = ["instrument", "sink"]
 

@@ -17,6 +17,7 @@ macro_rules! examples {
 examples! {
     catalogue_facet = "catalogue-facet" => "Dump the catalogue as YAML via `facet-yaml`.";
     catalogue_serde = "catalogue-serde" => "Dump the catalogue as YAML via `serde`.";
+    catalogue_snapshot = "catalogue-snapshot" => "Print the catalogue snapshot to commit and diff in CI.";
     instrument = "instrument" => "Fill `Option` fields from surrounding spans.";
     metrics = "metrics" => "Derive OpenTelemetry metrics from messages in a sink.";
     sink = "sink" => "A generic line printer plus a typed downcasting sink.";
