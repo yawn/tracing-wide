@@ -1,6 +1,7 @@
 //! The catalogue: one descriptor per message type, registered by `#[message]` (feature `catalogue`).
 
 use core::any::TypeId;
+use core::fmt;
 use std::collections::BTreeMap;
 
 use tracing::Level;
@@ -25,9 +26,10 @@ pub struct FieldDescriptor {
     #[cfg_attr(feature = "facet", facet(skip_serializing_if = Meta::is_empty))]
     pub meta: Meta,
     pub name: &'static str,
-    /// Field type as written (e.g. `"& 'static str"`, `"Option < usize >"`).
+    /// Read through [`type_name`](Self::type_name).
+    #[cfg_attr(feature = "serde", serde(rename = "type"))]
     #[cfg_attr(feature = "facet", facet(rename = "type"))]
-    pub r#type: &'static str,
+    type_name: TypeName,
 }
 
 /// A serializable mirror of `tracing::Level`, with its exact names; `Level::from` converts back.
@@ -86,6 +88,38 @@ pub struct MessageDescriptor {
     pub type_id: TypeId,
 }
 
+/// A field type's [`core::any::type_name`].
+#[cfg_attr(feature = "facet", derive(::facet::Facet))]
+#[cfg_attr(feature = "facet", facet(proxy = &'static str))]
+struct TypeName(#[cfg_attr(feature = "facet", facet(opaque))] fn() -> &'static str);
+
+impl FieldDescriptor {
+    /// `#[message]`-internal: `type_name` is `|| core::any::type_name::<T>()` for the field type `T`.
+    #[doc(hidden)]
+    pub const fn __new(
+        deprecated: Option<&'static str>,
+        doc: Option<&'static str>,
+        meta: Meta,
+        name: &'static str,
+        type_name: fn() -> &'static str,
+    ) -> Self {
+        Self {
+            deprecated,
+            doc,
+            meta,
+            name,
+            type_name: TypeName(type_name),
+        }
+    }
+
+    /// The field type, resolved by [`core::any::type_name`] (e.g. `"&str"`, `"core::option::Option<usize>"`).
+    /// The text can change between compiler versions.
+    pub fn type_name(&self) -> &'static str {
+        // This can be removed when type_name becomes const
+        self.type_name.get()
+    }
+}
+
 impl MessageDescriptor {
     /// The explicit [`id`](Self::id), else [`msg`](Self::msg): the value of [`Message::id`](crate::Message::id).
     pub fn resolved_id(&self) -> &'static str {
@@ -106,6 +140,13 @@ impl LevelName {
     }
 }
 
+impl TypeName {
+    /// The name.
+    fn get(&self) -> &'static str {
+        (self.0)()
+    }
+}
+
 impl From<LevelName> for Level {
     fn from(name: LevelName) -> Self {
         match name {
@@ -115,6 +156,40 @@ impl From<LevelName> for Level {
             LevelName::WARN => Level::WARN,
             LevelName::ERROR => Level::ERROR,
         }
+    }
+}
+
+/// The name, not the fn pointer's address.
+impl fmt::Debug for TypeName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(self.get(), f)
+    }
+}
+
+/// Serializes as the name.
+#[cfg(feature = "serde")]
+impl ::serde::Serialize for TypeName {
+    fn serialize<S: ::serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(self.get())
+    }
+}
+
+/// Facet serializes a `TypeName` as the name (serialize-only).
+// Infallible, but facet's `proxy` mechanism is defined in terms of `TryFrom`.
+#[cfg(feature = "facet")]
+#[allow(clippy::infallible_try_from)]
+impl TryFrom<&TypeName> for &'static str {
+    type Error = core::convert::Infallible;
+    fn try_from(type_name: &TypeName) -> Result<Self, Self::Error> {
+        Ok(type_name.get())
+    }
+}
+
+#[cfg(feature = "facet")]
+impl TryFrom<&'static str> for TypeName {
+    type Error = &'static str;
+    fn try_from(_: &'static str) -> Result<Self, Self::Error> {
+        Err("TypeName is serialize-only in the catalogue")
     }
 }
 

@@ -103,7 +103,7 @@ fn catalogue_registers_message_descriptors() {
 
     let service = d.fields.iter().find(|f| f.name == "service").unwrap();
 
-    assert_eq!(service.r#type, "& 'static str");
+    assert_eq!(service.type_name(), "&str");
     assert_eq!(service.doc, Some("Logical name of the service."));
     assert_eq!(service.deprecated, None);
 
@@ -114,7 +114,7 @@ fn catalogue_registers_message_descriptors() {
     let legacy = d.fields.iter().find(|f| f.name == "legacy_id").unwrap();
 
     assert_eq!(legacy.deprecated, Some("fold the id into `service`"));
-    assert_eq!(legacy.r#type, "Option < usize >");
+    assert_eq!(legacy.type_name(), "core::option::Option<usize>");
 
     assert_eq!(Level::from(descriptor("Renamed").level), Level::INFO);
 

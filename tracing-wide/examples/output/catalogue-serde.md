@@ -23,7 +23,7 @@ messages:
       type: usize
     - doc: Route template, e.g. `/users/:id`.
       name: route
-      type: '& ''static str'
+      type: '&str'
     level: INFO
     meta:
       owner: api
@@ -39,10 +39,10 @@ messages:
       type: usize
     - deprecated: fold the id into `service`
       name: legacy_id
-      type: Option < usize >
+      type: core::option::Option<usize>
     - doc: Logical name of the service.
       name: service
-      type: '& ''static str'
+      type: '&str'
     level: WARN
     meta:
       owner: platform

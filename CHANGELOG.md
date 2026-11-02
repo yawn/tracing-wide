@@ -8,6 +8,14 @@ Pre-1.0, a breaking change bumps the minor version.
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `FieldDescriptor::r#type` is replaced by
+  `FieldDescriptor::type_name()`: the field type as `core::any::type_name`
+  resolves it (`core::option::Option<usize>`, aliases resolved), not as written
+  (`Option < usize >`). The serde and facet manifests show the resolved type.
+  The text can change between compiler versions.
+
 ## [0.3.0] - 2026-11-01
 
 ### Added
