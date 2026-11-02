@@ -1,5 +1,5 @@
 HACK := "cargo hack --feature-powerset --exclude-features default,docs,std -p tracing-wide"
-TESTS := "--lib --test core --test sink --test catalogue --test instrument --test serde --test facet --test cross_crate"
+TESTS := "--lib --test core --test sink --test catalogue --test snapshot --test instrument --test serde --test facet --test cross_crate"
 
 check: check-native check-wasm
 
@@ -16,13 +16,16 @@ docs:
     rm -rf target/doc
     RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps
 
-examples: example-catalogue-facet example-catalogue-serde example-instrument example-metrics example-sink example-sink-facet example-sink-serde example-tags
+examples: example-catalogue-facet example-catalogue-serde example-catalogue-snapshot example-instrument example-metrics example-sink example-sink-facet example-sink-serde example-tags
 
 example-catalogue-facet:
     cargo run --example catalogue-facet --features catalogue,facet
 
 example-catalogue-serde:
     cargo run --example catalogue-serde --features catalogue,serde
+
+example-catalogue-snapshot:
+    cargo run --example catalogue-snapshot --features catalogue
 
 example-instrument:
     cargo run --example instrument --features instrument,sink

@@ -270,13 +270,13 @@ impl ToTokens for MessageField {
         } = self;
 
         tokens.extend(quote! {
-            ::tracing_wide::catalogue::FieldDescriptor {
-                deprecated: #deprecated,
-                doc: #doc,
-                meta: #meta,
-                name: ::core::stringify!(#ident),
-                r#type: ::core::stringify!(#ty),
-            }
+            ::tracing_wide::catalogue::FieldDescriptor::__new(
+                #deprecated,
+                #doc,
+                #meta,
+                ::core::stringify!(#ident),
+                || ::core::any::type_name::<#ty>()
+            )
         });
     }
 }
@@ -720,15 +720,16 @@ impl ::tracing_wide::__private::Sealed for Demo {}
 ::tracing_wide::__register_message! {
     ::tracing_wide::catalogue::MessageDescriptor { deprecated :
     ::core::option::Option::None, doc : ::core::option::Option::Some("A demo event."),
-    fields : & [::tracing_wide::catalogue::FieldDescriptor { deprecated :
-    ::core::option::Option::None, doc : ::core::option::Option::None, meta :
-    ::tracing_wide::Meta::__new(& []), name : ::core::stringify!(a), r#type :
-    ::core::stringify!(usize), }, ::tracing_wide::catalogue::FieldDescriptor { deprecated
-    : ::core::option::Option::None, doc : ::core::option::Option::None, meta :
-    ::tracing_wide::Meta::__new(& [("unit", "ms")]), name : ::core::stringify!(b), r#type
-    : ::core::stringify!(usize), }], id : ::core::option::Option::None, level :
-    ::tracing_wide::catalogue::LevelName::WARN, meta : Demo::META, msg : "hi", origin :
-    Demo::ORIGIN, tags : Demo::TAGS, type_id : ::core::any::TypeId::of:: < Demo > (), }
+    fields : &
+    [::tracing_wide::catalogue::FieldDescriptor::__new(::core::option::Option::None,
+    ::core::option::Option::None, ::tracing_wide::Meta::__new(& []),
+    ::core::stringify!(a), || ::core::any::type_name:: < usize > ()),
+    ::tracing_wide::catalogue::FieldDescriptor::__new(::core::option::Option::None,
+    ::core::option::Option::None, ::tracing_wide::Meta::__new(& [("unit", "ms")]),
+    ::core::stringify!(b), || ::core::any::type_name:: < usize > ())], id :
+    ::core::option::Option::None, level : ::tracing_wide::catalogue::LevelName::WARN,
+    meta : Demo::META, msg : "hi", origin : Demo::ORIGIN, tags : Demo::TAGS, type_id :
+    ::core::any::TypeId::of:: < Demo > (), }
 }
 #[doc(hidden)]
 impl ::tracing_wide::__private::MessageBehaviour for Demo {

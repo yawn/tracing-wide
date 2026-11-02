@@ -1,11 +1,16 @@
 //! The catalogue: one descriptor per message type, registered by `#[message]` (feature `catalogue`).
 
 use core::any::TypeId;
+use core::fmt;
+use core::iter;
 use std::collections::BTreeMap;
 
 use tracing::Level;
 
 use crate::{Meta, Origin, Tags};
+
+/// Descriptors by the resolved id they share: the result of [`duplicates`].
+pub type Duplicates = BTreeMap<&'static str, Vec<&'static MessageDescriptor>>;
 
 /// One field's catalogue metadata.
 #[derive(Debug)]
@@ -25,9 +30,10 @@ pub struct FieldDescriptor {
     #[cfg_attr(feature = "facet", facet(skip_serializing_if = Meta::is_empty))]
     pub meta: Meta,
     pub name: &'static str,
-    /// Field type as written (e.g. `"& 'static str"`, `"Option < usize >"`).
+    /// Read through [`type_name`](Self::type_name).
+    #[cfg_attr(feature = "serde", serde(rename = "type"))]
     #[cfg_attr(feature = "facet", facet(rename = "type"))]
-    pub r#type: &'static str,
+    type_name: TypeName,
 }
 
 /// A serializable mirror of `tracing::Level`, with its exact names; `Level::from` converts back.
@@ -86,10 +92,35 @@ pub struct MessageDescriptor {
     pub type_id: TypeId,
 }
 
-impl MessageDescriptor {
-    /// The explicit [`id`](Self::id), else [`msg`](Self::msg): the value of [`Message::id`](crate::Message::id).
-    pub fn resolved_id(&self) -> &'static str {
-        self.id.unwrap_or(self.msg)
+/// A field type's [`core::any::type_name`].
+#[cfg_attr(feature = "facet", derive(::facet::Facet))]
+#[cfg_attr(feature = "facet", facet(proxy = &'static str))]
+struct TypeName(#[cfg_attr(feature = "facet", facet(opaque))] fn() -> &'static str);
+
+impl FieldDescriptor {
+    /// `#[message]`-internal: `type_name` is `|| core::any::type_name::<T>()` for the field type `T`.
+    #[doc(hidden)]
+    pub const fn __new(
+        deprecated: Option<&'static str>,
+        doc: Option<&'static str>,
+        meta: Meta,
+        name: &'static str,
+        type_name: fn() -> &'static str,
+    ) -> Self {
+        Self {
+            deprecated,
+            doc,
+            meta,
+            name,
+            type_name: TypeName(type_name),
+        }
+    }
+
+    /// The field type, resolved by [`core::any::type_name`] (e.g. `"&str"`, `"core::option::Option<usize>"`).
+    /// The text can change between compiler versions.
+    pub fn type_name(&self) -> &'static str {
+        // This can be removed when type_name becomes const
+        self.type_name.get()
     }
 }
 
@@ -106,6 +137,20 @@ impl LevelName {
     }
 }
 
+impl MessageDescriptor {
+    /// The explicit [`id`](Self::id), else [`msg`](Self::msg): the value of [`Message::id`](crate::Message::id).
+    pub fn resolved_id(&self) -> &'static str {
+        self.id.unwrap_or(self.msg)
+    }
+}
+
+impl TypeName {
+    /// The name.
+    fn get(&self) -> &'static str {
+        (self.0)()
+    }
+}
+
 impl From<LevelName> for Level {
     fn from(name: LevelName) -> Self {
         match name {
@@ -115,6 +160,40 @@ impl From<LevelName> for Level {
             LevelName::WARN => Level::WARN,
             LevelName::ERROR => Level::ERROR,
         }
+    }
+}
+
+/// The name, not the fn pointer's address.
+impl fmt::Debug for TypeName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(self.get(), f)
+    }
+}
+
+/// Serializes as the name.
+#[cfg(feature = "serde")]
+impl ::serde::Serialize for TypeName {
+    fn serialize<S: ::serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(self.get())
+    }
+}
+
+/// Facet serializes a `TypeName` as the name (serialize-only).
+// Infallible, but facet's `proxy` mechanism is defined in terms of `TryFrom`.
+#[cfg(feature = "facet")]
+#[allow(clippy::infallible_try_from)]
+impl TryFrom<&TypeName> for &'static str {
+    type Error = core::convert::Infallible;
+    fn try_from(type_name: &TypeName) -> Result<Self, Self::Error> {
+        Ok(type_name.get())
+    }
+}
+
+#[cfg(feature = "facet")]
+impl TryFrom<&'static str> for TypeName {
+    type Error = &'static str;
+    fn try_from(_: &'static str) -> Result<Self, Self::Error> {
+        Err("TypeName is serialize-only in the catalogue")
     }
 }
 
@@ -145,8 +224,8 @@ pub fn all() -> impl Iterator<Item = &'static MessageDescriptor> {
 /// ```
 ///
 /// The map is ordered by id, and each list by definition site.
-pub fn duplicates() -> BTreeMap<&'static str, Vec<&'static MessageDescriptor>> {
-    let mut by_id: BTreeMap<&'static str, Vec<&'static MessageDescriptor>> = BTreeMap::new();
+pub fn duplicates() -> Duplicates {
+    let mut by_id = Duplicates::new();
     for descriptor in all() {
         by_id
             .entry(descriptor.resolved_id())
@@ -163,6 +242,89 @@ pub fn duplicates() -> BTreeMap<&'static str, Vec<&'static MessageDescriptor>> {
     }
 
     by_id
+}
+
+/// The catalogue as text to commit and diff in CI: a `tracing-wide catalogue <major>.<minor>` line (e.g. `0.3`), then
+/// one block per message, by id, after a blank line. A block has one `"<id>" message <fact>` or
+/// `"<id>" field "<name>" <fact>` line per fact (all tags on one line), sorted by bytes; each value but the level is
+/// quoted and escaped as by `{:?}`. `Err` holds the [`duplicates`]. Write it from an application test, and let CI run
+/// `git diff --exit-code catalogue.txt`:
+///
+/// ```no_run
+/// #[test]
+/// fn catalogue() {
+///     let snapshot = tracing_wide::catalogue::snapshot().unwrap_or_else(|dupes| panic!("{dupes:#?}"));
+///     std::fs::write("catalogue.txt", snapshot).unwrap();
+/// }
+/// ```
+pub fn snapshot() -> Result<String, Duplicates> {
+    // TODO: docs from `#[doc = include_str!(..)]` or `cfg_attr(.., doc = ..)`, and `#[deprecated(since = ..)]`, never
+    // reach the descriptor, so the snapshot misses them.
+    let dupes = duplicates();
+
+    if !dupes.is_empty() {
+        return Err(dupes);
+    }
+
+    let mut messages: Vec<&MessageDescriptor> = all().collect();
+
+    messages.sort_unstable_by_key(|m| m.resolved_id());
+
+    let blocks = messages.into_iter().map(|message| {
+        let id = message.resolved_id();
+        let tags: Vec<String> = message.tags.iter().map(|t| format!("{t:?}")).collect();
+        let mut facts = vec![
+            format!("level {}", message.level.as_str()),
+            format!("msg {:?}", message.msg),
+        ];
+
+        facts.extend((!tags.is_empty()).then(|| format!("tags {}", tags.join(" "))));
+
+        let prefixes = iter::once((
+            "message".to_owned(),
+            message.deprecated,
+            message.doc,
+            message.meta,
+            facts,
+        ))
+        .chain(message.fields.iter().map(|f| {
+            (
+                format!("field {:?}", f.name),
+                f.deprecated,
+                f.doc,
+                f.meta,
+                vec![format!("type {:?}", f.type_name())],
+            )
+        }));
+
+        let mut lines: Vec<String> = prefixes
+            .flat_map(|(prefix, deprecated, doc, meta, facts)| {
+                deprecated
+                    .map(|reason| format!("deprecated {reason:?}"))
+                    .into_iter()
+                    .chain(doc.map(|d| format!("doc {d:?}")))
+                    .chain(meta.iter().map(|(k, v)| format!("meta {k:?} {v:?}")))
+                    .chain(facts)
+                    .map(move |fact| format!("{id:?} {prefix} {fact}"))
+            })
+            .collect();
+
+        lines.sort_unstable();
+        lines.join("\n")
+    });
+
+    let header = concat!(
+        "tracing-wide catalogue ",
+        env!("CARGO_PKG_VERSION_MAJOR"),
+        ".",
+        env!("CARGO_PKG_VERSION_MINOR")
+    );
+
+    Ok(iter::once(header.to_owned())
+        .chain(blocks)
+        .collect::<Vec<_>>()
+        .join("\n\n")
+        + "\n")
 }
 
 inventory::collect!(MessageDescriptor);

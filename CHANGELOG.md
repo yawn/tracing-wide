@@ -8,6 +8,24 @@ Pre-1.0, a breaking change bumps the minor version.
 
 ## [Unreleased]
 
+### Added
+
+- `catalogue::snapshot()`: the catalogue as sorted text, one fact per line and
+  one block per message, for an application to commit and diff in CI
+  (`git diff --exit-code`). A change to an id, a level, a `msg`, a tag, a meta
+  pair, a doc, a deprecation, a field or a field type changes the text; field
+  order and `origin` do not. New example `catalogue-snapshot`.
+- `catalogue::Duplicates`, the type of `duplicates()` and of the `Err` of
+  `snapshot()`.
+
+### Changed
+
+- **Breaking:** `FieldDescriptor::r#type` is replaced by
+  `FieldDescriptor::type_name()`: the field type as `core::any::type_name`
+  resolves it (`core::option::Option<usize>`, aliases resolved), not as written
+  (`Option < usize >`). The serde and facet manifests show the resolved type.
+  The text can change between compiler versions.
+
 ## [0.3.0] - 2026-11-01
 
 ### Added

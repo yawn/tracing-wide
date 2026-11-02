@@ -10,7 +10,7 @@ mod common;
 
 use common::descriptor;
 use tracing::Level;
-use tracing_wide::message;
+use tracing_wide::{catalogue, message};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -103,7 +103,7 @@ fn catalogue_registers_message_descriptors() {
 
     let service = d.fields.iter().find(|f| f.name == "service").unwrap();
 
-    assert_eq!(service.r#type, "& 'static str");
+    assert_eq!(service.type_name(), "&str");
     assert_eq!(service.doc, Some("Logical name of the service."));
     assert_eq!(service.deprecated, None);
 
@@ -114,7 +114,7 @@ fn catalogue_registers_message_descriptors() {
     let legacy = d.fields.iter().find(|f| f.name == "legacy_id").unwrap();
 
     assert_eq!(legacy.deprecated, Some("fold the id into `service`"));
-    assert_eq!(legacy.r#type, "Option < usize >");
+    assert_eq!(legacy.type_name(), "core::option::Option<usize>");
 
     assert_eq!(Level::from(descriptor("Renamed").level), Level::INFO);
 
@@ -139,11 +139,11 @@ fn descriptor_keeps_the_raw_id_and_resolves_the_join_key() {
     assert_eq!(fallback.resolved_id(), "service started");
 }
 
-/// Reports exactly the planted collisions by resolved id, each with its descriptors.
+/// Reports exactly the planted collisions by resolved id, each with its descriptors; `snapshot` returns them as `Err`.
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn catalogue_reports_duplicate_ids_with_their_definition_sites() {
-    let dupes = tracing_wide::catalogue::duplicates();
+    let dupes = catalogue::duplicates();
 
     let counts: Vec<(&str, usize)> = dupes.iter().map(|(id, ds)| (*id, ds.len())).collect();
 
@@ -167,6 +167,8 @@ fn catalogue_reports_duplicate_ids_with_their_definition_sites() {
         assert_eq!(d.origin.krate, "tracing-wide");
         assert!(d.origin.file.ends_with("catalogue.rs"));
     }
+
+    assert!(catalogue::snapshot().unwrap_err().keys().eq(dupes.keys()));
 }
 
 // Native-only, like the serde catalogue manifest (serde_norway / facet-json are
