@@ -15,7 +15,7 @@ use tracing_wide::{
     sink::{Sink, Sinks},
 };
 
-/// Maps concrete message types to instruments; labels come from low-cardinality fields only.
+/// Maps messages tagged `metrics` to instruments; labels come from low-cardinality fields only.
 struct Metrics {
     queue_depth: Gauge<u64>,
     request_duration: Histogram<u64>,
@@ -23,19 +23,29 @@ struct Metrics {
 }
 
 /// Carries the current value: a sync gauge is only as fresh as the last such event.
-#[message(msg = "queue sampled")]
+#[message(msg = "queue sampled", tags = ["metrics"])]
 struct QueueSampled {
     depth: u64,
 }
 
-#[message(msg = "request completed")]
+#[message(msg = "request completed", tags = ["metrics"])]
 struct RequestCompleted {
     duration_ms: u64,
     route: &'static str,
 }
 
+/// Not tagged `metrics`: the sink skips it before any downcast.
+#[message(msg = "user signed in")]
+struct UserSignedIn {
+    user_id: u64,
+}
+
 impl Sink for Metrics {
     fn on_message(&self, m: &dyn Message) {
+        if !m.tags().contains("metrics") {
+            return;
+        }
+
         let any = m.as_any();
 
         if let Some(req) = any.downcast_ref::<RequestCompleted>() {
@@ -75,6 +85,8 @@ fn main() {
     });
 
     event!(QueueSampled { depth: 3 });
+
+    event!(UserSignedIn { user_id: 42 });
 
     provider.shutdown().expect("metrics flush on shutdown");
 }
