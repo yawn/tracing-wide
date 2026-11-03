@@ -36,8 +36,6 @@ fn snapshot_has_one_sorted_fact_per_line() {
     let snapshot = catalogue::snapshot().unwrap();
     let (header, body) = snapshot.split_once('\n').unwrap();
 
-    let version: Vec<&str> = env!("CARGO_PKG_VERSION").split('.').take(2).collect();
-
     assert_eq!(
         body,
         r#"
@@ -59,8 +57,5 @@ fn snapshot_has_one_sorted_fact_per_line() {
 "service started" message msg "service started"
 "#
     );
-    assert_eq!(
-        header,
-        format!("tracing-wide catalogue {}", version.join("."))
-    );
+    assert_eq!(header, "tracing-wide catalogue snapshot v1");
 }

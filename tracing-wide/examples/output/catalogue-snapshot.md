@@ -1,6 +1,6 @@
 ```console
 $ cargo run -q --example catalogue-snapshot --features catalogue
-tracing-wide catalogue 0.3
+tracing-wide catalogue snapshot v1
 
 "billing.payment_charged" field "amount" meta "unit" "cents"
 "billing.payment_charged" field "amount" type "usize"

@@ -9,6 +9,9 @@ use tracing::Level;
 
 use crate::{Meta, Origin, Tags};
 
+/// The version of the [`snapshot`] text format, independent of the crate version.
+pub const SNAPSHOT_FORMAT_VERSION: &str = "v1";
+
 /// Descriptors by the resolved id they share: the result of [`duplicates`].
 pub type Duplicates = BTreeMap<&'static str, Vec<&'static MessageDescriptor>>;
 
@@ -244,11 +247,11 @@ pub fn duplicates() -> Duplicates {
     by_id
 }
 
-/// The catalogue as text to commit and diff in CI: a `tracing-wide catalogue <major>.<minor>` line (e.g. `0.3`), then
-/// one block per message, by id, after a blank line. A block has one `"<id>" message <fact>` or
-/// `"<id>" field "<name>" <fact>` line per fact (all tags on one line), sorted by bytes; each value but the level is
-/// quoted and escaped as by `{:?}`. `Err` holds the [`duplicates`]. Write it from an application test, and let CI run
-/// `git diff --exit-code catalogue.txt`:
+/// The catalogue as text to commit and diff in CI: a `tracing-wide catalogue snapshot <version>` line
+/// ([`SNAPSHOT_FORMAT_VERSION`]), then one block per message, by id, after a blank line. A block has one
+/// `"<id>" message <fact>` or `"<id>" field "<name>" <fact>` line per fact (all tags on one line), sorted by bytes;
+/// each value but the level is quoted and escaped as by `{:?}`. `Err` holds the [`duplicates`]. Write it from an
+/// application test, and let CI run `git diff --exit-code catalogue.txt`:
 ///
 /// ```no_run
 /// #[test]
@@ -313,14 +316,9 @@ pub fn snapshot() -> Result<String, Duplicates> {
         lines.join("\n")
     });
 
-    let header = concat!(
-        "tracing-wide catalogue ",
-        env!("CARGO_PKG_VERSION_MAJOR"),
-        ".",
-        env!("CARGO_PKG_VERSION_MINOR")
-    );
+    let header = format!("tracing-wide catalogue snapshot {SNAPSHOT_FORMAT_VERSION}");
 
-    Ok(iter::once(header.to_owned())
+    Ok(iter::once(header)
         .chain(blocks)
         .collect::<Vec<_>>()
         .join("\n\n")
